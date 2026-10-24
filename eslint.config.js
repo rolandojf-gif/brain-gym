@@ -13,4 +13,5 @@ export default tseslint.config(
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },
+  { files: ['netlify/**/*.mts'], languageOptions: { globals: { ...globals.node } } },
 );
