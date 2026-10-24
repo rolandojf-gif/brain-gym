@@ -241,6 +241,18 @@ table.cap td.num, table.cap th { text-align: center; }
 table.cap .t-cap { text-align: left; }
 table.cap td { padding: 6px 8px; }
 
+/* ── Lectura y escritura ──────────────────────────────────────────────── */
+.aviso-sin-mirar { background: var(--card-2); border: 2px solid var(--ink); border-left: 8px solid var(--orange); padding: 10px 14px; font-size: 14.5px; max-width: 760px; }
+.lectura .form-bloque textarea { font: 400 17px/1.6 var(--f-body); }
+.lectura form[data-accion="escrito"] { max-width: 760px; }
+.contador { font: 600 13px var(--f-mono); margin: 0; }
+.contador.corto { color: var(--warn); }
+.contador.ok { color: var(--ok); }
+.contador.largo { color: var(--bad); }
+.escrito { max-width: 760px; }
+.escrito h2.sec:first-child { margin-top: 0; }
+.escrito p { font-size: 16.5px; line-height: 1.65; }
+
 /* ── Móvil: la marca y el tema en una fila, las pestañas a todo el ancho y desplazables. ── */
 @media (max-width: 720px) {
   .topnav { padding: 10px 14px; gap: 10px; }

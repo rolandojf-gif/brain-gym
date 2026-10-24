@@ -7,6 +7,7 @@ import { idSesion, registrarSesion } from './dominio/sesion';
 import type { Cambio } from './dominio/sincronizacion';
 import type { Actividad, Ajustes, Colecciones } from './dominio/tipos';
 import { diaLogico } from './lib/dia';
+import { plural } from './lib/fmt';
 
 export interface Ctx {
   datos: Colecciones;
@@ -122,12 +123,12 @@ export class App {
       try {
         const { recibidos } = await sincronizar(this.almacen);
         const pendientes = (await this.almacen.pendientes()).length;
-        this.sync = { texto: `Sincronizado ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}${pendientes ? ` · ${pendientes} pendientes` : ''}`, tipo: 'ok' };
+        this.sync = { texto: `Sincronizado ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}${pendientes ? ` · ${plural(pendientes, 'cambio pendiente', 'cambios pendientes')}` : ''}`, tipo: 'ok' };
         if (recibidos > 0) await this.cargar();
         this.alCambiar();
       } catch (e) {
         const pendientes = (await this.almacen.pendientes()).length;
-        const extra = pendientes ? ` · ${pendientes} cambios sin enviar` : '';
+        const extra = pendientes ? ` · ${plural(pendientes, 'cambio sin enviar', 'cambios sin enviar')}` : '';
         if (e instanceof ErrorDeSync) {
           this.sync = { texto: e.motivo === 'sin-token' ? `Sólo en este dispositivo${extra}` : `${e.message}${extra}`, tipo: e.motivo === 'sin-token' ? 'apagado' : e.motivo === 'red' ? 'aviso' : 'error' };
         } else {
