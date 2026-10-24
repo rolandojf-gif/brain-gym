@@ -29,14 +29,19 @@ function servidor() {
 }
 
 describe('Almacen', () => {
-  it('la primera vez siembra ajustes y fuentes, y no los duplica al reabrir', async () => {
+  it('la primera vez siembra ajustes, fuentes y las 12 lecturas semilla, y no los duplica al reabrir', async () => {
     const nombre = 'bg-siembra';
     const a = await abrir(nombre);
     expect(await a.leer('ajustes')).toHaveLength(1);
     expect((await a.leer('fuentes')).map((f) => f.id)).toEqual(['catalogo-retos']);
+    const lecturas = await a.leer('lecturas');
+    expect(lecturas).toHaveLength(12);
+    expect(lecturas[0]?.titulo).toContain('Meditations on Moloch');
+    expect(lecturas[11]?.titulo).toContain('Action Bias');
     a.cerrar();
     const b = await abrir(nombre);
     expect(await b.leer('fuentes')).toHaveLength(1);
+    expect(await b.leer('lecturas')).toHaveLength(12);
     expect(await b.meta('esquema')).toBe(ESQUEMA_VERSION);
   });
 
@@ -117,8 +122,9 @@ describe('sincronizar', () => {
     expect(await nombres(mac)).toEqual(['del mac', 'del móvil']);
     expect(await nombres(movil)).toEqual(['del mac', 'del móvil']);
     expect(await mac.pendientes()).toHaveLength(0);
-    // Ajustes y fuentes sembrados en los dos dispositivos se funden en uno.
+    // Ajustes, fuentes y lecturas semilla sembrados en los dos dispositivos se funden en uno sin duplicarse.
     expect(await mac.leer('fuentes')).toHaveLength(1);
+    expect(await mac.leer('lecturas')).toHaveLength(12);
   });
 
   it('una edición posterior en el móvil gana a la del Mac', async () => {

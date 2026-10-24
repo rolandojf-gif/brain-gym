@@ -38,9 +38,11 @@ export const config: Config = { path: '/api/sync' };
 
 /* Comparación en tiempo constante sobre los resúmenes SHA-256, para no filtrar la longitud ni el contenido del token. */
 function autorizado(cabecera: string | null): boolean {
-  const esperado = process.env.BG_TOKEN;
+  const netlifyEnv = (globalThis as { Netlify?: { env?: { get(k: string): string | undefined } } }).Netlify?.env;
+  const esperado = (netlifyEnv?.get('BG_TOKEN') ?? process.env.BG_TOKEN)?.trim();
   if (!esperado || esperado.length < 32 || !cabecera?.startsWith('Bearer ')) return false;
-  const a = createHash('sha256').update(cabecera.slice(7)).digest();
+  const recibido = cabecera.slice(7).trim();
+  const a = createHash('sha256').update(recibido).digest();
   const b = createHash('sha256').update(esperado).digest();
   return timingSafeEqual(a, b);
 }

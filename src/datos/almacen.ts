@@ -1,7 +1,7 @@
 /* Almacén local en IndexedDB: una tienda por colección, más `meta` (versión de esquema, cursor de sincronización,
    copia previa) y `pendientes` (cambios locales aún no enviados). */
 import { openDB, type IDBPDatabase } from 'idb';
-import { ajustesPorDefecto, fuentesIniciales } from '../dominio/ajustes';
+import { ajustesPorDefecto, fuentesIniciales, lecturasIniciales } from '../dominio/ajustes';
 import { ID_FUENTE_RETOS, fuenteRetos } from '../dominio/catalogo-retos';
 import { exportar, migrar, ErrorDeDatos } from '../dominio/migraciones';
 import { fusionar, ganador, type Cambio } from '../dominio/sincronizacion';
@@ -51,6 +51,11 @@ export class Almacen {
       await tx.done;
     } else if (!(await this.db.get('fuentes', ID_FUENTE_RETOS))) {
       await this.db.put('fuentes', fuenteRetos(ahora));
+    }
+    if ((await this.db.count('lecturas')) === 0) {
+      const tx = this.db.transaction('lecturas', 'readwrite');
+      for (const l of lecturasIniciales(ahora)) await tx.objectStore('lecturas').put(l);
+      await tx.done;
     }
   }
 

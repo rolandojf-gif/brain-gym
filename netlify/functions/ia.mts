@@ -36,11 +36,11 @@ export default async (req: Request): Promise<Response> => {
     return json({ error: e instanceof Error ? e.message : 'Petición mal formada' }, 400);
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = leerEnv('OPENROUTER_API_KEY');
   if (!apiKey) {
-    return json({ error: 'Falta configurar OPENROUTER_API_KEY en el servidor' }, 500);
+    return json({ error: 'Falta configurar OPENROUTER_API_KEY en el servidor de Netlify' }, 500);
   }
-  const model = process.env.OPENROUTER_MODEL || MODELO_POR_DEFECTO;
+  const model = leerEnv('OPENROUTER_MODEL') || MODELO_POR_DEFECTO;
 
   let res: Response;
   try {
@@ -85,11 +85,18 @@ export const config: Config = { path: '/api/ia' };
 
 /* Comparación en tiempo constante sobre los resúmenes SHA-256, para no filtrar la longitud ni el contenido del token. */
 function autorizado(cabecera: string | null): boolean {
-  const esperado = process.env.BG_TOKEN;
+  const esperado = leerEnv('BG_TOKEN');
   if (!esperado || esperado.length < 32 || !cabecera?.startsWith('Bearer ')) return false;
-  const a = createHash('sha256').update(cabecera.slice(7)).digest();
+  const recibido = cabecera.slice(7).trim();
+  const a = createHash('sha256').update(recibido).digest();
   const b = createHash('sha256').update(esperado).digest();
   return timingSafeEqual(a, b);
+}
+
+function leerEnv(clave: string): string | undefined {
+  const netlifyEnv = (globalThis as { Netlify?: { env?: { get(k: string): string | undefined } } }).Netlify?.env;
+  const valor = netlifyEnv?.get(clave) ?? process.env[clave];
+  return valor?.trim() || undefined;
 }
 
 function json(cuerpo: unknown, status = 200): Response {

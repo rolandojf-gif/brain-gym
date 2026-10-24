@@ -4,6 +4,7 @@
    juicio del Abogado del Diablo (/api/ia). */
 import { accion, campos, type Ctx, type Vista } from '../app';
 import { ErrorDeIa, auditarConIa } from '../datos/ia';
+import { LECTURAS_SEMILLA, lecturasIniciales } from '../dominio/ajustes';
 import { nuevaTarjeta } from '../dominio/fsrs';
 import { actualizar, nuevo } from '../dominio/registro';
 import { contarPalabras } from '../dominio/texto';
@@ -56,6 +57,11 @@ function renderCola(ctx: Ctx): string {
   const pendientes = vivas.filter((l) => l.estado === 'pendiente').sort((a, b) => a.creado.localeCompare(b.creado));
   const porEscribir = vivas.filter((l) => l.estado === 'leida');
   const escritos = ctx.datos.escritos.filter((e) => !e.borrado).sort((a, b) => b.enviadoEl.localeCompare(a.enviadoEl));
+  const idsVivos = new Set(vivas.map((l) => l.id));
+  const faltanSemillas = LECTURAS_SEMILLA.some((s) => !idsVivos.has(s.id));
+  const btnRescate = faltanSemillas
+    ? `<div class="acciones"><button type="button" class="btn sutil" data-accion="cargar-recomendadas">[ Cargar lecturas recomendadas (12 lecturas base) ]</button></div>`
+    : '';
   const titulo = (id: string) => vivas.find((l) => l.id === id)?.titulo ?? ctx.datos.lecturas.find((l) => l.id === id)?.titulo ?? 'Lectura';
   return `
     ${cabecera('Lectura · Extracción 3x1', 'Lee con foco y extrae de memoria 3 piezas quirúrgicas (máx. ~40 palabras por campo): tesis, mecanismo y punto ciego.')}
@@ -67,6 +73,7 @@ function renderCola(ctx: Ctx): string {
     ${pendientes.length ? `<ul class="lista">${pendientes.map((l) => `
       <li><div class="li-main"><b>${esc(l.titulo)}</b><span class="m-sub">${meta(l)} ${enlace(l)}</span></div>
       <div class="li-acc"><button class="btn" data-accion="leida" data-id="${esc(l.id)}">Leída: extraer 3x1</button><button class="btn sutil" data-accion="descartar" data-id="${esc(l.id)}">Descartar</button></div></li>`).join('')}</ul>` : vacio('La cola está vacía.')}
+    ${btnRescate}
 
     <form class="panel form-bloque" data-accion="anadir">
       <div class="fila">
@@ -239,6 +246,13 @@ export const lectura: Vista = {
     accion(raiz, 'click', 'descartar', async (b) => {
       const l = ctx.datos.lecturas.find((x) => x.id === b.dataset.id);
       if (l) await ctx.guardar({ coleccion: 'lecturas', registro: actualizar(l, { estado: 'descartada' }, new Date()) });
+    });
+    accion(raiz, 'click', 'cargar-recomendadas', async () => {
+      const idsVivos = new Set(ctx.datos.lecturas.filter((l) => !l.borrado).map((l) => l.id));
+      const nuevas = lecturasIniciales(new Date()).filter((l) => !idsVivos.has(l.id));
+      if (nuevas.length === 0) return ctx.avisar('Las 12 lecturas recomendadas ya están en tu lista.');
+      await ctx.guardar(...nuevas.map((registro) => ({ coleccion: 'lecturas' as const, registro })));
+      ctx.avisar(`Se han añadido ${plural(nuevas.length, 'lectura recomendada', 'lecturas recomendadas')} a la cola.`);
     });
     accion(raiz, 'submit', 'escrito', async (f, e) => {
       e.preventDefault();
