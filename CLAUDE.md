@@ -31,9 +31,13 @@ npm run verify     # lint + typecheck + tests + build; debe pasar antes de cada 
 npm run test:watch # tests en modo vigilancia
 ```
 
+Variable de entorno en Netlify: `BG_TOKEN` (mínimo 32 caracteres; generar con `openssl rand -base64 32`). Cada dispositivo la introduce una vez en la pestaña Datos.
+
 ## Convenciones
 
 - Capas: `src/dominio` (puro, con tests) ← `src/datos` (IndexedDB, exportación, sincronización) ← `src/vistas`. El dominio no importa nada del DOM ni de IndexedDB.
+- Funciones de Netlify en `netlify/functions/*.mts`; sus tests en `netlify/*.test.ts`, **nunca** dentro de `netlify/functions` (Netlify publicaría cualquier archivo de esa carpeta como función). La lógica va en `src/dominio` para probarla sin Netlify.
+- Tests de IndexedDB con `fake-indexeddb`.
 - Lógica de dominio con tests obligatorios: FSRS, Brier, calibración, sesión del día, migraciones, fusión de sincronización.
 - Nombres de dominio en español (`sesionDeHoy`, `intentos`, `predicciones`); el código de librerías externas, como venga.
 - Modelo de datos versionado: cualquier cambio de forma lleva una migración pura nueva con su test (ver `docs/arquitectura.md`). Nunca editar una migración ya publicada.
