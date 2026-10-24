@@ -1,6 +1,6 @@
 # Arquitectura y modelo de datos
 
-Propuesta para revisar antes de programar los módulos. Lo que cambie tras la revisión se actualiza aquí.
+Aprobada el 24 oct 2026. Lo que cambie después se actualiza aquí.
 
 ## Visión general
 
@@ -76,7 +76,7 @@ Objetivo: lo más simple que sea correcto para un usuario con dos dispositivos.
 - **Unidad:** el registro. Cada cambio local actualiza `actualizado` y se apunta en una cola de salida.
 - **Regla de fusión:** gana el registro con `actualizado` mayor (empate: id de dispositivo). Los `repasos` son inmutables, así que nunca entran en conflicto: se unen.
 - **Servidor:** `/api/sync` recibe `{ desde, cambios[] }`, fusiona con la regla anterior y devuelve los registros que han cambiado en el servidor desde `desde`. `desde` es un contador del servidor, no un reloj del dispositivo, para no depender de que los relojes coincidan al pedir cambios.
-- **Almacén:** Netlify Blobs. Para que dos sincronizaciones simultáneas no se pisen, la escritura es condicional (sólo si nadie ha escrito desde que se leyó) y se reintenta si falla. Tengo que verificar en la documentación actual de `@netlify/blobs` que la escritura condicional está disponible; si no, la alternativa es un bloqueo breve en otro blob.
+- **Almacén:** Netlify Blobs. Para que dos sincronizaciones simultáneas no se pisen, la escritura es condicional: `setJSON(clave, datos, { onlyIfMatch: etag })` (o `onlyIfNew` la primera vez), disponible en `@netlify/blobs` 11 (comprobado en sus tipos, oct 2026). Si devuelve `modified: false`, se vuelve a leer, fusionar y escribir.
 - **Cuándo:** al abrir la app, al volver a ella y tras cada sesión terminada, si hay conexión. Sin conexión, todo funciona y la cola espera.
 - **Riesgo conocido:** si repasas la misma tarjeta en los dos dispositivos sin conexión, el estado FSRS de una de las dos se pierde (los dos registros de repaso se conservan). Es raro con un solo usuario; si pasa, se puede recalcular el estado desde los repasos con `ts-fsrs`.
 

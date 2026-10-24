@@ -10,11 +10,11 @@ Registro de las decisiones abiertas del brief (`docs/brief.md`). Cada una dice q
 - La sincronización es una función de Netlify que guarda los registros en Netlify Blobs. Sin base de datos ni cuentas de terceros.
 - Detalle en `docs/arquitectura.md` («Sincronización»).
 
-## D2. Despliegue y acceso · propuesta, pendiente de confirmar
+## D2. Despliegue y acceso · decidida (24 oct 2026)
 
 Con datos personales en la nube (sincronización), las funciones deben estar protegidas.
 
-- **Propuesta:** token secreto largo (256 bits, `openssl rand -base64 32`) en la variable de entorno `BG_TOKEN` de Netlify. La app lo pide una vez por dispositivo y lo guarda en él; cada función lo exige en la cabecera `Authorization: Bearer …` y lo compara en tiempo constante. HTTPS lo pone Netlify.
+- Token secreto largo (256 bits, `openssl rand -base64 32`) en la variable de entorno `BG_TOKEN` de Netlify. La app lo pide una vez por dispositivo y lo guarda en él; cada función lo exige en la cabecera `Authorization: Bearer …` y lo compara en tiempo constante. HTTPS lo pone Netlify.
 - El sitio estático no contiene datos personales: sin token, sólo se ve una app vacía.
 - Descartado: la protección por contraseña de Netlify (de pago y no protege mejor las funciones).
 
@@ -33,10 +33,10 @@ Fuera de la Fase 1 según el brief. Propuesta: en Fase 1, sólo registro propio 
 - Vistas como funciones que devuelven HTML con `esc()` para todo dato del usuario, igual que MOLOCH.SH, pero tipadas.
 - Dependencias de ejecución previstas: `ts-fsrs` (FSRS) e `idb` (envoltorio de IndexedDB). En las funciones, `@netlify/blobs`. En pruebas, `fake-indexeddb`.
 
-## Pendientes de respuesta
+## Otras decisiones · decididas (24 oct 2026)
 
-1. Importar datos existentes (Anki, Fatebook, registro de Stat 110) en Fase 1, o empezar limpio. Recomendación: empezar limpio salvo que haya volumen.
-2. Catálogo de capítulos de Stat 110 precargado (sólo metadatos) o ejercicios dados de alta al hacerlos. Recomendación: precargar capítulos y dejar que los ejercicios se den de alta al hacerlos; el total por capítulo, opcional.
-3. Corte del día a las 04:00 hora local. Recomendación: sí (implementado en `src/lib/dia.ts`, configurable).
-4. Las sesiones no hechas no se arrastran; los repasos y las predicciones vencidas sí. Recomendación: sí.
-5. «Escribir sin mirar» es un compromiso del usuario: la app oculta el enlace, no puede impedir abrir otra pestaña.
+1. **Sin importadores en Fase 1.** Se empieza limpio; Anki, Fatebook y el registro actual de Stat 110 no se importan.
+2. **Catálogo de Stat 110:** se precargan los capítulos (sólo metadatos); los ejercicios se dan de alta al hacerlos y el total por capítulo es opcional.
+3. **Corte del día a las 04:00** hora local, configurable (`src/lib/dia.ts`).
+4. **Las sesiones no hechas no se arrastran**; los repasos y las predicciones vencidas sí se acumulan.
+5. **«Escribir sin mirar» es un compromiso del usuario**: la app oculta el enlace, no puede impedir abrir otra pestaña.
