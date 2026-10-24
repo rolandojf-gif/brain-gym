@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { actualizar, borrar, nuevo } from './registro';
-import { fusionar, fusionarColeccion, ganador } from './sincronizacion';
+import { aplicarCambios, estadoVacio, fusionar, fusionarColeccion, ganador } from './sincronizacion';
 import { coleccionesVacias, type Base } from './tipos';
 
 type R = Base & { v: string };
@@ -42,5 +42,50 @@ describe('fusión de sincronización', () => {
     const a = coleccionesVacias(), b = coleccionesVacias();
     const res = fusionar(a, b);
     expect(Object.values(res).every((l) => Array.isArray(l) && l.length === 0)).toBe(true);
+  });
+});
+
+describe('servidor de sincronización', () => {
+  const tarjeta = (id: string, v: string, min: number) => ({ coleccion: 'tarjetas' as const, registro: r(id, v, min) });
+
+  it('el primer envío se guarda y no se devuelve al mismo dispositivo', () => {
+    const { estado, respuesta, modificado } = aplicarCambios(estadoVacio(), { desde: 0, cambios: [tarjeta('a', 'mac', 1)] });
+    expect(modificado).toBe(true);
+    expect(estado.seq).toBe(1);
+    expect(respuesta).toEqual({ seq: 1, cambios: [] });
+  });
+
+  it('otro dispositivo recibe lo que no tiene', () => {
+    const e1 = aplicarCambios(estadoVacio(), { desde: 0, cambios: [tarjeta('a', 'mac', 1)] }).estado;
+    const { respuesta } = aplicarCambios(e1, { desde: 0, cambios: [tarjeta('b', 'movil', 2)] });
+    expect(respuesta.seq).toBe(2);
+    expect(respuesta.cambios.map((c) => c.registro.id)).toEqual(['a']);
+  });
+
+  it('sólo devuelve lo posterior al cursor', () => {
+    let e = aplicarCambios(estadoVacio(), { desde: 0, cambios: [tarjeta('a', 'x', 1)] }).estado;
+    e = aplicarCambios(e, { desde: 1, cambios: [tarjeta('b', 'y', 2)] }).estado;
+    expect(aplicarCambios(e, { desde: 1, cambios: [] }).respuesta.cambios.map((c) => c.registro.id)).toEqual(['b']);
+    expect(aplicarCambios(e, { desde: 2, cambios: [] }).respuesta.cambios).toEqual([]);
+  });
+
+  it('un cambio más antiguo no pisa y el dispositivo recibe la versión ganadora', () => {
+    const e = aplicarCambios(estadoVacio(), { desde: 0, cambios: [tarjeta('a', 'nuevo', 5)] }).estado;
+    const { estado, respuesta, modificado } = aplicarCambios(e, { desde: 1, cambios: [tarjeta('a', 'viejo', 1)] });
+    expect(modificado).toBe(false);
+    expect((estado.registros.tarjetas?.a?.registro as R).v).toBe('nuevo');
+    expect(respuesta.cambios.map((c) => (c.registro as R).v)).toEqual(['nuevo']);
+  });
+
+  it('reenviar lo mismo no cambia nada (idempotente)', () => {
+    const e = aplicarCambios(estadoVacio(), { desde: 0, cambios: [tarjeta('a', 'x', 1)] }).estado;
+    const otra = aplicarCambios(e, { desde: 1, cambios: [tarjeta('a', 'x', 1)] });
+    expect(otra.modificado).toBe(false);
+    expect(otra.respuesta.cambios).toEqual([]);
+  });
+
+  it('ignora colecciones desconocidas', () => {
+    const { modificado } = aplicarCambios(estadoVacio(), { desde: 0, cambios: [{ coleccion: 'rara' as never, registro: r('a', 'x') }] });
+    expect(modificado).toBe(false);
   });
 });
