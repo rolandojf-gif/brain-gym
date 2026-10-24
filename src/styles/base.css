@@ -204,6 +204,27 @@ table.plan thead th { font: 700 11px var(--f-mono); text-transform: uppercase; b
 .a-calibracion { --c: #6D5BD0; }
 .a-concepto { --c: var(--warn); }
 
+/* ── Repaso ───────────────────────────────────────────────────────────── */
+.flash { display: flex; flex-direction: column; gap: 16px; max-width: 720px; }
+.flash-cara .lbl, .lbl { font: 700 10.5px var(--f-mono); text-transform: uppercase; color: var(--muted); letter-spacing: .05em; display: block; margin-bottom: 6px; }
+.flash-texto { font: 500 20px/1.45 var(--f-body); overflow-wrap: anywhere; }
+.flash-cara.reverso { border-top: 2px dashed var(--line); padding-top: 14px; }
+.btn.ancho { width: 100%; min-height: 56px; font-size: 14px; }
+.notas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.btn.nota { flex-direction: column; min-height: 64px; gap: 3px; padding: 8px 4px; }
+.btn.nota small { font: 500 11px var(--f-mono); text-transform: none; color: var(--muted); }
+.btn.nota.n1 { border-top: 6px solid var(--bad); }
+.btn.nota.n2 { border-top: 6px solid var(--warn); }
+.btn.nota.n3 { border-top: 6px solid var(--ok); }
+.btn.nota.n4 { border-top: 6px solid var(--lime); }
+.lista { list-style: none; padding: 0; margin: 16px 0 0; background: var(--card); border: 2px solid var(--ink); box-shadow: var(--shadow); }
+.lista li { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.lista li:last-child { border-bottom: 0; }
+.li-main { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+.li-acc { display: flex; gap: 8px; flex-wrap: wrap; }
+.li-acc .btn { min-height: 34px; padding: 6px 10px; font-size: 11px; }
+.m-sub { font: 400 12px/1.4 var(--f-mono); color: var(--muted); }
+
 /* ── Móvil: la marca y el tema en una fila, las pestañas a todo el ancho y desplazables. ── */
 @media (max-width: 720px) {
   .topnav { padding: 10px 14px; gap: 10px; }

@@ -38,3 +38,6 @@ export function fmtReloj(segundos: number): string {
 
 export const fmtPct = (x: number | null, decimales = 0) => (x === null ? '—' : `${(x * 100).toFixed(decimales).replace('.', ',')} %`);
 export const fmtNum = (x: number | null, decimales = 3) => (x === null ? '—' : x.toFixed(decimales).replace('.', ','));
+
+/** «1 tarjeta», «3 tarjetas». */
+export const plural = (n: number, uno: string, varios = `${uno}s`) => `${n} ${n === 1 ? uno : varios}`;

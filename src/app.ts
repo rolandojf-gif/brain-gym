@@ -65,9 +65,12 @@ export class App {
 
   ctx(sub: string | null): Ctx {
     const ahora = new Date();
+    // `datos` y `ajustes` se leen en vivo: tras un guardado, los manejadores de eventos ven ya lo nuevo.
+    const leerDatos = () => this.datos;
+    const leerAjustes = () => this.ajustes;
     return {
-      datos: this.datos,
-      ajustes: this.ajustes,
+      get datos() { return leerDatos(); },
+      get ajustes() { return leerAjustes(); },
       ahora,
       hoy: diaLogico(ahora, this.ajustes.horaCorte),
       sub,
