@@ -38,6 +38,7 @@ Variable de entorno en Netlify: `BG_TOKEN` (mínimo 32 caracteres; generar con `
 - Capas: `src/dominio` (puro, con tests) ← `src/datos` (IndexedDB, exportación, sincronización) ← `src/vistas`. El dominio no importa nada del DOM ni de IndexedDB.
 - Funciones de Netlify en `netlify/functions/*.mts`; sus tests en `netlify/*.test.ts`, **nunca** dentro de `netlify/functions` (Netlify publicaría cualquier archivo de esa carpeta como función). La lógica va en `src/dominio` para probarla sin Netlify.
 - Tests de IndexedDB con `fake-indexeddb`.
+- PWA: `public/manifest.webmanifest` y `public/sw.js` (escrito a mano, sin dependencias). Si cambia la lista de archivos base o la estrategia del service worker, subir `CACHE` (`bg-vN`). El service worker sólo se registra en producción.
 - Lógica de dominio con tests obligatorios: FSRS, Brier, calibración, sesión del día, migraciones, fusión de sincronización.
 - Nombres de dominio en español (`sesionDeHoy`, `intentos`, `predicciones`); el código de librerías externas, como venga.
 - Modelo de datos versionado: cualquier cambio de forma lleva una migración pura nueva con su test (ver `docs/arquitectura.md`). Nunca editar una migración ya publicada.
