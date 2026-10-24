@@ -7,6 +7,7 @@ import { esc } from './lib/html';
 import * as temporizador from './lib/temporizador';
 import { NOMBRE_ACTIVIDAD } from './vistas/comun';
 import { datos } from './vistas/datos';
+import { estudio } from './vistas/estudio';
 import { hoy } from './vistas/hoy';
 import { progreso } from './vistas/progreso';
 import { repaso } from './vistas/repaso';
@@ -21,7 +22,7 @@ const enConstruccion = (titulo: string): Vista => ({
 
 const VISTAS: Record<string, Vista> = {
   hoy,
-  estudio: enConstruccion('Estudio'),
+  estudio,
   lectura: enConstruccion('Lectura y escritura'),
   repaso,
   calibracion: enConstruccion('Calibración'),
