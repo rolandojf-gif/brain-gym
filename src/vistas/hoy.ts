@@ -4,7 +4,7 @@ import { ETIQUETA_ESTADO } from '../dominio/estudio';
 import { nuevo } from '../dominio/registro';
 import { sesionDeHoy } from '../dominio/sesion';
 import type { Actividad, Aprendizaje } from '../dominio/tipos';
-import { fmtDuracion, fmtFechaLarga, fmtRelativo } from '../lib/fmt';
+import { fmtDuracion, fmtFechaLarga, fmtRelativo, plural } from '../lib/fmt';
 import { esc, urlSegura } from '../lib/html';
 import * as temporizador from '../lib/temporizador';
 import { NOMBRE_ACTIVIDAD, VISTA_ACTIVIDAD, cabecera } from './comun';
@@ -25,7 +25,7 @@ function detalle(ctx: Ctx, a: Actividad, pend: ReturnType<typeof sesionDeHoy>['p
       return siguiente ? `45 min. Siguiente: «${esc(siguiente.titulo)}».` : '45 min. La cola está vacía: añade una lectura.';
     }
     case 'repaso':
-      return pend.tarjetasVencidas.length ? `${pend.tarjetasVencidas.length} tarjetas vencidas.` : 'Nada vencido ahora mismo.';
+      return pend.tarjetasVencidas.length ? `${plural(pend.tarjetasVencidas.length, 'tarjeta vencida', 'tarjetas vencidas')}.` : 'Nada vencido ahora mismo.';
     case 'calibracion':
       return `20 min. Registra 3–5 predicciones${pend.prediccionesPorResolver.length ? ` y resuelve ${pend.prediccionesPorResolver.length} vencidas` : ''}.`;
     case 'concepto':
@@ -70,8 +70,8 @@ export const hoy: Vista = {
     const p = s.pendiente;
     const extra: string[] = [];
     const enPlan = new Set(s.actividades.map((x) => x.actividad));
-    if (!enPlan.has('repaso') && p.tarjetasVencidas.length) extra.push(`<li><a href="#repaso">${p.tarjetasVencidas.length} tarjetas vencidas</a></li>`);
-    if (p.prediccionesPorResolver.length) extra.push(`<li><a href="#calibracion">${p.prediccionesPorResolver.length} predicciones por resolver</a></li>`);
+    if (!enPlan.has('repaso') && p.tarjetasVencidas.length) extra.push(`<li><a href="#repaso">${plural(p.tarjetasVencidas.length, 'tarjeta vencida', 'tarjetas vencidas')}</a></li>`);
+    if (p.prediccionesPorResolver.length) extra.push(`<li><a href="#calibracion">${plural(p.prediccionesPorResolver.length, 'predicción por resolver', 'predicciones por resolver')}</a></li>`);
     if (p.calibracionAtrasada) extra.push('<li><a href="#calibracion">Calibración semanal sin hacer en los últimos 7 días</a></li>');
     const actividades = s.actividades.length
       ? s.actividades.map((x, i) => tarjetaActividad(ctx, x.actividad, x.hecha, i, p)).join('')

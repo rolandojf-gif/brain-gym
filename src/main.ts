@@ -9,6 +9,7 @@ import { NOMBRE_ACTIVIDAD } from './vistas/comun';
 import { datos } from './vistas/datos';
 import { hoy } from './vistas/hoy';
 import { progreso } from './vistas/progreso';
+import { repaso } from './vistas/repaso';
 
 const $ = <T extends Element>(s: string) => document.querySelector<T>(s);
 const $$ = <T extends Element>(s: string) => [...document.querySelectorAll<T>(s)];
@@ -22,7 +23,7 @@ const VISTAS: Record<string, Vista> = {
   hoy,
   estudio: enConstruccion('Estudio'),
   lectura: enConstruccion('Lectura y escritura'),
-  repaso: enConstruccion('Repaso'),
+  repaso,
   calibracion: enConstruccion('Calibración'),
   progreso,
   datos,
