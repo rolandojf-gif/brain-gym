@@ -39,7 +39,7 @@ Colecciones:
 
 | Colección | Campos propios | Notas |
 | --- | --- | --- |
-| `ajustes` | `planSemanal: Record<0..6, Actividad[]>`, `horaCorte`, `diaCalibracion` | Un solo registro. `Actividad = 'estudio' \| 'lectura' \| 'repaso' \| 'calibracion' \| 'concepto'`. Plan por defecto: L-X-V estudio, M-J lectura, repaso diario, calibración el domingo. |
+| `ajustes` | `planSemanal: Record<0..6, Actividad[]>`, `horaCorte` | Un solo registro. `Actividad = 'estudio' \| 'lectura' \| 'repaso' \| 'calibracion' \| 'concepto'`. Plan por defecto: L-X-V estudio, M-J lectura, repaso diario, calibración el domingo. |
 | `fuentes` | `titulo`, `tipo`, `url`, `capitulos: {id, titulo, ejercicios?: number}[]` | Stat 110, Think Bayes. Sólo metadatos, nunca contenido. |
 | `intentos` | `fuenteId`, `capitulo`, `ejercicio`, `estado`, `segundos`, `notaError`, `dia`, `tarjetaId?` | `estado = 'sin_ayuda' \| 'con_pista' \| 'solucion' \| 'no_resuelto'`. Un ejercicio puede tener varios intentos. |
 | `lecturas` | `url`, `titulo`, `medio`, `tema`, `estado`, `leidaEl?` | `estado = 'pendiente' \| 'leida' \| 'escrita' \| 'descartada'`. No se guarda el texto del artículo. |
@@ -85,7 +85,7 @@ Objetivo: lo más simple que sea correcto para un usuario con dos dispositivos.
 `sesionDeHoy(ahora, ajustes, datos)` es pura y devuelve:
 
 1. Las actividades del plan para el día de la semana del día lógico (corte a las 04:00 por defecto).
-2. Lo pendiente: tarjetas vencidas, predicciones vencidas sin resolver, calibración semanal si no se ha hecho esta semana.
+2. Lo pendiente: tarjetas vencidas, predicciones vencidas sin resolver y la calibración si hoy no toca pero no se ha hecho en los últimos 7 días.
 3. Lo ya hecho hoy (sesiones registradas), para marcarlo.
 
 Las sesiones no hechas de días anteriores no se arrastran.
