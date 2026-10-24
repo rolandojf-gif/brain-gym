@@ -2,6 +2,7 @@
    copia previa) y `pendientes` (cambios locales aún no enviados). */
 import { openDB, type IDBPDatabase } from 'idb';
 import { ajustesPorDefecto, fuentesIniciales } from '../dominio/ajustes';
+import { ID_FUENTE_RETOS, fuenteRetos } from '../dominio/catalogo-retos';
 import { exportar, migrar, ErrorDeDatos } from '../dominio/migraciones';
 import { fusionar, ganador, type Cambio } from '../dominio/sincronizacion';
 import { COLECCIONES, ESQUEMA_VERSION, coleccionesVacias, type Base, type Coleccion, type Colecciones, type Exportacion } from '../dominio/tipos';
@@ -48,6 +49,8 @@ export class Almacen {
       await tx.objectStore('ajustes').put(ajustesPorDefecto(ahora));
       for (const f of fuentesIniciales(ahora)) await tx.objectStore('fuentes').put(f);
       await tx.done;
+    } else if (!(await this.db.get('fuentes', ID_FUENTE_RETOS))) {
+      await this.db.put('fuentes', fuenteRetos(ahora));
     }
   }
 

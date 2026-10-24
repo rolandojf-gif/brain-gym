@@ -6,7 +6,6 @@ import { fmtReloj } from './lib/fmt';
 import { esc } from './lib/html';
 import * as temporizador from './lib/temporizador';
 import { NOMBRE_ACTIVIDAD } from './vistas/comun';
-import { calibracion } from './vistas/calibracion';
 import { datos } from './vistas/datos';
 import { estudio } from './vistas/estudio';
 import { hoy } from './vistas/hoy';
@@ -22,7 +21,6 @@ const VISTAS: Record<string, Vista> = {
   estudio,
   lectura,
   repaso,
-  calibracion,
   progreso,
   datos,
 };
@@ -32,7 +30,8 @@ let vistaActual = '';
 let pintadoPendiente = false;
 
 function ruta(): { nombre: string; sub: string | null } {
-  const [v = '', ...resto] = location.hash.replace(/^#/, '').split('/');
+  const [raw = '', ...resto] = location.hash.replace(/^#/, '').split('/');
+  const v = raw === 'retos' ? 'estudio' : raw;
   let sub = resto.join('/');
   try { sub = decodeURIComponent(sub); } catch { /* se usa tal cual */ }
   return { nombre: v in VISTAS ? v : 'hoy', sub: sub || null };

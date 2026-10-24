@@ -1,4 +1,4 @@
-/* 07 · Datos: sincronización, exportar/importar y ajustes (plan semanal y corte del día). */
+/* 06 · Datos: sincronización, exportar/importar y ajustes (plan semanal y corte del día). */
 import { accion, campos, type Vista } from '../app';
 import { actualizar } from '../dominio/registro';
 import type { Actividad, PlanSemanal } from '../dominio/tipos';
@@ -6,7 +6,7 @@ import { esc } from '../lib/html';
 import { NOMBRE_ACTIVIDAD, cabecera, descargar } from './comun';
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-const ACTIVIDADES: Actividad[] = ['estudio', 'lectura', 'repaso', 'calibracion', 'concepto'];
+const ACTIVIDADES: Actividad[] = ['estudio', 'lectura', 'repaso', 'concepto'];
 
 export const datos: Vista = {
   titulo: 'Datos',

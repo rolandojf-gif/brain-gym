@@ -3,18 +3,18 @@ import type { Actividad } from '../dominio/tipos';
 import { esc } from '../lib/html';
 
 export const NOMBRE_ACTIVIDAD: Record<Actividad, string> = {
-  estudio: 'Estudio',
-  lectura: 'Lectura y escritura',
+  estudio: 'Retos',
+  lectura: 'Lectura 3x1',
   repaso: 'Repaso',
   calibracion: 'Calibración',
-  concepto: 'Algo nuevo',
+  concepto: 'Modelo mental',
 };
 
 export const VISTA_ACTIVIDAD: Record<Actividad, string> = {
   estudio: 'estudio',
   lectura: 'lectura',
   repaso: 'repaso',
-  calibracion: 'calibracion',
+  calibracion: 'progreso',
   concepto: 'hoy',
 };
 

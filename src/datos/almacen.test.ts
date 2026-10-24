@@ -33,10 +33,10 @@ describe('Almacen', () => {
     const nombre = 'bg-siembra';
     const a = await abrir(nombre);
     expect(await a.leer('ajustes')).toHaveLength(1);
-    expect((await a.leer('fuentes')).map((f) => f.id).sort()).toEqual(['stat110', 'thinkbayes']);
+    expect((await a.leer('fuentes')).map((f) => f.id)).toEqual(['catalogo-retos']);
     a.cerrar();
     const b = await abrir(nombre);
-    expect(await b.leer('fuentes')).toHaveLength(2);
+    expect(await b.leer('fuentes')).toHaveLength(1);
     expect(await b.meta('esquema')).toBe(ESQUEMA_VERSION);
   });
 
@@ -118,7 +118,7 @@ describe('sincronizar', () => {
     expect(await nombres(movil)).toEqual(['del mac', 'del móvil']);
     expect(await mac.pendientes()).toHaveLength(0);
     // Ajustes y fuentes sembrados en los dos dispositivos se funden en uno.
-    expect(await mac.leer('fuentes')).toHaveLength(2);
+    expect(await mac.leer('fuentes')).toHaveLength(1);
   });
 
   it('una edición posterior en el móvil gana a la del Mac', async () => {

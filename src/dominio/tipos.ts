@@ -58,12 +58,20 @@ export interface Lectura extends Base {
   leidaEl?: string;
 }
 
+export interface FeedbackIa {
+  diagnostico: string;
+  contraataque: string;
+  modeloMentalSugerido: string;
+  fecha: string;
+}
+
 export interface Escrito extends Base {
   lecturaId: string;
   resumen: string;
   objecion: string;
   palabras: number;
   enviadoEl: string;
+  feedbackIa?: FeedbackIa;
 }
 
 /** Estado FSRS serializable: el `Card` de ts-fsrs con las fechas en ISO. */

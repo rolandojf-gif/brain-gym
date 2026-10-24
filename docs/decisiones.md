@@ -35,8 +35,8 @@ Fuera de la Fase 1 según el brief. Propuesta: en Fase 1, sólo registro propio 
 
 ## Otras decisiones · decididas (24 oct 2026)
 
-1. **Sin importadores en Fase 1.** Se empieza limpio; Anki, Fatebook y el registro actual de Stat 110 no se importan.
-2. **Catálogo de Stat 110:** se precargan los capítulos (sólo metadatos); los ejercicios se dan de alta al hacerlos y el total por capítulo es opcional.
+1. **Sin importadores externos en Fase 1.** Se empieza limpio en IndexedDB con exportación/importación JSON propia.
+2. **Catálogo integrado de Retos:** 16 retos autocontenidos distribuidos en 4 bloques temáticos (Teoría de Juegos, Incentivos y Sistemas, Paradojas de Decisión y Sesgos/Modelos Mentales), mapeados sobre `fuentes` e `intentos`.
 3. **Corte del día a las 04:00** hora local, configurable (`src/lib/dia.ts`).
 4. **Las sesiones no hechas no se arrastran**; los repasos y las predicciones vencidas sí se acumulan.
 5. **«Escribir sin mirar» es un compromiso del usuario**: la app oculta el enlace, no puede impedir abrir otra pestaña.

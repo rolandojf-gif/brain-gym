@@ -226,13 +226,13 @@ table.plan thead th { font: 700 11px var(--f-mono); text-transform: uppercase; b
 .li-acc .btn { min-height: 34px; padding: 6px 10px; font-size: 11px; }
 .m-sub { font: 400 12px/1.4 var(--f-mono); color: var(--muted); }
 
-/* ── Estudio ──────────────────────────────────────────────────────────── */
+/* ── Retos (Ring de Sparring y Acordeón de 3 pasos) ───────────────────── */
 .fuentes { margin-bottom: 4px; }
 .campo.corto-v { flex: 0 1 110px; }
 input.mini { width: 72px; min-height: 34px; padding: 4px 6px; font-size: 14px; }
 .estados label { border: 2px solid var(--ink); padding: 6px 10px; background: var(--card); }
 .estados label:has(input:checked) { background: var(--lime); color: #121211; }
-.tag { display: inline-block; font: 700 10px/1 var(--f-mono); text-transform: uppercase; padding: 3px 5px; border: 2px solid var(--ink); vertical-align: 2px; margin-left: 4px; }
+.tag { display: inline-block; font: 700 10px/1 var(--f-mono); text-transform: uppercase; padding: 3px 5px; border: 2px solid var(--ink); vertical-align: 2px; margin-left: 4px; background: var(--card-2); }
 .tag.e-sin_ayuda { background: var(--lime); color: #121211; }
 .tag.e-con_pista { background: var(--card-2); }
 .tag.e-solucion { background: var(--orange); color: #121211; }
@@ -240,6 +240,42 @@ input.mini { width: 72px; min-height: 34px; padding: 4px 6px; font-size: 14px; }
 table.cap td.num, table.cap th { text-align: center; }
 table.cap .t-cap { text-align: left; }
 table.cap td { padding: 6px 8px; }
+
+.reto-ring { display: flex; flex-direction: column; gap: 16px; }
+.reto-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 2px solid var(--ink); padding-bottom: 12px; }
+.reto-titulo { font: 700 24px/1.15 var(--f-head); margin: 4px 0 0; }
+.reto-escenario { font: 400 17px/1.6 var(--f-body); margin: 0; background: var(--card-2); border-left: 6px solid var(--orange); padding: 12px 14px; }
+.reto-opciones { display: grid; gap: 10px; }
+.reto-opcion {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px;
+  border: 2px solid var(--ink); background: var(--card); cursor: pointer;
+  font: 500 15.5px/1.45 var(--f-body); color: var(--text); text-transform: none; letter-spacing: 0;
+}
+.reto-opcion:hover { background: rgba(204, 255, 0, .18); }
+.reto-opcion:has(input:checked) { background: var(--card-2); outline: 3px solid var(--orange); }
+.reto-opcion.op-correcta { border-left: 8px solid var(--ok); background: rgba(14, 159, 110, .12); }
+.reto-opcion.op-trampa { border-left: 8px solid var(--bad); background: rgba(200, 30, 58, .10); }
+.op-letra {
+  flex: none; width: 26px; height: 26px; display: grid; place-content: center;
+  border: 2px solid var(--ink); background: var(--lime); color: #121211; font: 700 12px var(--f-mono);
+}
+.op-texto { flex: 1; }
+.reto-paso { border-top: 2px dashed var(--ink); padding-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+.reto-pista { background: var(--card-2); border: 2px solid var(--ink); border-left: 6px solid var(--warn); padding: 12px 14px; font-size: 15px; }
+.reto-veredicto { padding: 10px 14px; border: 2px solid var(--ink); font: 700 14px var(--f-mono); }
+.reto-veredicto.ok { background: var(--lime); color: #121211; }
+.reto-veredicto.trampa { background: var(--orange); color: #121211; }
+.reto-explicacion p { margin: 0; font-size: 16px; line-height: 1.6; }
+.reto-modelo { background: var(--card-2); border: 2px solid var(--ink); border-left: 8px solid var(--ok); padding: 12px 14px; }
+.reto-modelo p { margin: 4px 0 0; font-size: 16px; }
+.bloque-cat { display: flex; flex-direction: column; gap: 10px; }
+.bloque-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.bloque-head h3 { font: 700 18px/1.2 var(--f-head); margin: 2px 0 4px; }
+.bloque-cat .lista { margin-top: 4px; box-shadow: none; }
+.flash-inline { margin-top: 12px; padding-top: 12px; border-top: 2px dashed var(--line); display: flex; flex-direction: column; gap: 8px; }
+.flash-q { font: 600 15.5px/1.45 var(--f-body); margin: 0; }
+.flash-a { font: 400 15px/1.45 var(--f-body); margin: 0; padding: 8px 10px; background: var(--card-2); border-left: 4px solid var(--ok); }
+.check-linea { display: inline-flex; align-items: center; gap: 8px; font: 600 12.5px var(--f-mono); color: var(--text); cursor: pointer; }
 
 /* ── Lectura y escritura ──────────────────────────────────────────────── */
 .aviso-sin-mirar { background: var(--card-2); border: 2px solid var(--ink); border-left: 8px solid var(--orange); padding: 10px 14px; font-size: 14.5px; max-width: 760px; }
@@ -252,6 +288,34 @@ table.cap td { padding: 6px 8px; }
 .escrito { max-width: 760px; }
 .escrito h2.sec:first-child { margin-top: 0; }
 .escrito p { font-size: 16.5px; line-height: 1.65; }
+
+/* ── Abogado del Diablo (IA · Terminal de Alto Contraste) ─────────────── */
+.ia-cta { max-width: 760px; margin-top: 16px; }
+.ia-error {
+  margin: 10px 0 0; padding: 10px 14px;
+  background: var(--card-2); border: 2px solid var(--ink); border-left: 8px solid var(--bad);
+  font: 600 13.5px/1.45 var(--f-mono); color: var(--text);
+}
+.abogado-diablo {
+  max-width: 760px; margin-top: 20px;
+  background: var(--asphalt); color: #E8E7E1;
+  border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--orange);
+  padding: 18px; display: flex; flex-direction: column; gap: 16px;
+}
+.ad-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding-bottom: 10px; border-bottom: 2px solid #34342F;
+  font: 700 12.5px/1.2 var(--f-mono); color: var(--lime); letter-spacing: .04em;
+}
+.ad-head small { color: #9C9B95; font-weight: 400; }
+.ad-bloque { display: flex; flex-direction: column; gap: 6px; }
+.ad-lbl { font: 700 11.5px/1.2 var(--f-mono); color: var(--orange); letter-spacing: .05em; text-transform: uppercase; }
+.ad-bloque p { margin: 0; font: 400 15.5px/1.6 var(--f-body); color: #E8E7E1; }
+.ad-regla {
+  background: #181816; border: 2px solid var(--lime); padding: 12px 14px;
+}
+.ad-regla .ad-lbl { color: var(--lime); }
+.ad-regla p { font-family: var(--f-mono); font-size: 14.5px; color: #FFFFFF; }
 
 /* ── Calibración ──────────────────────────────────────────────────────── */
 .graf-cal { margin-top: 18px; max-width: 520px; }

@@ -39,8 +39,8 @@ Colecciones:
 
 | Colección | Campos propios | Notas |
 | --- | --- | --- |
-| `ajustes` | `planSemanal: Record<0..6, Actividad[]>`, `horaCorte` | Un solo registro. `Actividad = 'estudio' \| 'lectura' \| 'repaso' \| 'calibracion' \| 'concepto'`. Plan por defecto: L-X-V estudio, M-J lectura, repaso diario, calibración el domingo. |
-| `fuentes` | `titulo`, `tipo`, `url`, `capitulos: {id, titulo, ejercicios?: number}[]` | Stat 110, Think Bayes. Sólo metadatos, nunca contenido. |
+| `ajustes` | `planSemanal: Record<0..6, Actividad[]>`, `horaCorte` | Un solo registro. `Actividad = 'estudio' \| 'lectura' \| 'repaso' \| 'calibracion' \| 'concepto'`. Plan por defecto: L-X-V retos (`estudio`), M-J lectura 3x1, repaso y modelo mental a diario. |
+| `fuentes` | `titulo`, `tipo`, `url`, `capitulos: {id, titulo, ejercicios?: number}[]` | Catálogo integrado de retos (`catalogo-retos`, 4 bloques de 4 retos). |
 | `intentos` | `fuenteId`, `capitulo`, `ejercicio`, `estado`, `segundos`, `notaError`, `dia`, `tarjetaId?` | `estado = 'sin_ayuda' \| 'con_pista' \| 'solucion' \| 'no_resuelto'`. Un ejercicio puede tener varios intentos. |
 | `lecturas` | `url`, `titulo`, `medio`, `tema`, `estado`, `leidaEl?` | `estado = 'pendiente' \| 'leida' \| 'escrita' \| 'descartada'`. No se guarda el texto del artículo. |
 | `escritos` | `lecturaId`, `resumen`, `objecion`, `palabras`, `enviadoEl` | Fase 2 añade `feedbackIa?` y `revision30?`. |

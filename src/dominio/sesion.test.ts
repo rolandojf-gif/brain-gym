@@ -10,10 +10,10 @@ const lunes = new Date(2026, 9, 26, 18, 0);
 const ajustes = ajustesPorDefecto(lunes);
 const sesion = (dia: string, actividad: Actividad): Sesion =>
   nuevo({ dia, actividad, inicio: `${dia}T10:00:00Z`, segundos: 600 }, lunes);
-const vacio = { sesiones: [], tarjetas: [], predicciones: [] };
+const vacio = { sesiones: [], tarjetas: [] };
 
 describe('sesionDeHoy', () => {
-  it('el lunes toca estudio, repaso y concepto', () => {
+  it('el lunes toca estudio (retos), repaso y concepto', () => {
     const s = sesionDeHoy(lunes, ajustes, vacio);
     expect(s.dia).toBe('2026-10-26');
     expect(s.actividades.map((a) => a.actividad)).toEqual(['estudio', 'repaso', 'concepto']);
@@ -47,18 +47,9 @@ describe('sesionDeHoy', () => {
     expect(s.pendiente.tarjetasVencidas).toHaveLength(1);
   });
 
-  it('la calibración es pendiente si no se ha hecho en 7 días y hoy no toca', () => {
-    expect(sesionDeHoy(lunes, ajustes, vacio).pendiente.calibracionAtrasada).toBe(true);
-    const hecha = { ...vacio, sesiones: [sesion('2026-10-25', 'calibracion')] };
-    expect(sesionDeHoy(lunes, ajustes, hecha).pendiente.calibracionAtrasada).toBe(false);
-    const vieja = { ...vacio, sesiones: [sesion('2026-10-19', 'calibracion')] };
-    expect(sesionDeHoy(lunes, ajustes, vieja).pendiente.calibracionAtrasada).toBe(true);
-  });
-
-  it('el domingo la calibración va en el plan, no como pendiente', () => {
+  it('el domingo no incluye calibración en el plan por defecto', () => {
     const s = sesionDeHoy(new Date(2026, 10, 1, 18), ajustes, vacio);
-    expect(s.actividades.map((a) => a.actividad)).toContain('calibracion');
-    expect(s.pendiente.calibracionAtrasada).toBe(false);
+    expect(s.actividades.map((a) => a.actividad)).toEqual(['repaso', 'concepto']);
   });
 
   it('respeta un plan editado', () => {

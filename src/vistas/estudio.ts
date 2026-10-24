@@ -1,137 +1,378 @@
-/* 02 · Estudio: registro de ejercicios por fuente y capítulo, y progreso por capítulo. No se copia el contenido:
-   sólo se enlaza la fuente y se registra el intento. */
+/* 02 · Retos: «Ring de Sparring» interactivo autocontenido con el acordeón de 3 pasos
+   (1. Compromiso/Jugada inicial → 2. Andamiaje opcional/Pista → 3. Choque con la realidad y cierre en 1 clic). */
 import { accion, campos, type Ctx, type Vista } from '../app';
-import { ETIQUETA_ESTADO, progresoPorCapitulo, proporcionSinAyuda } from '../dominio/estudio';
-import { actualizar, borrar, nuevo } from '../dominio/registro';
-import type { EstadoIntento, Fuente, Intento } from '../dominio/tipos';
+import {
+  BLOQUES_RETOS,
+  CATALOGO_RETOS,
+  ID_FUENTE_RETOS,
+  estadoDeReto,
+  fuenteRetos,
+  siguienteRetoPendiente,
+  type Reto,
+} from '../dominio/catalogo-retos';
+import { ETIQUETA_ESTADO, desgloseResolucion, progresoPorCapitulo } from '../dominio/estudio';
+import { nuevaTarjeta } from '../dominio/fsrs';
+import { borrar, nuevo } from '../dominio/registro';
+import type { EstadoIntento, Intento } from '../dominio/tipos';
 import { fmtDuracion, fmtPct, fmtRelativo, plural } from '../lib/fmt';
-import { esc, urlSegura } from '../lib/html';
+import { esc } from '../lib/html';
 import { cabecera, vacio } from './comun';
 
-const ESTADOS: EstadoIntento[] = ['sin_ayuda', 'con_pista', 'solucion', 'no_resuelto'];
-const CLAVE_FUENTE = 'bg.estudio.fuente';
-
-function fuenteActual(ctx: Ctx): Fuente | undefined {
-  const fuentes = ctx.datos.fuentes.filter((f) => !f.borrado);
-  let id: string | null = null;
-  try { id = localStorage.getItem(CLAVE_FUENTE); } catch { /* sin preferencia guardada */ }
-  return fuentes.find((f) => f.id === id) ?? fuentes[0];
+interface EstadoAcordeon {
+  retoId: string;
+  paso: 1 | 2 | 3;
+  opcionElegida: string;
+  logica: string;
+  pistaDesbloqueada: boolean;
+  inicioMs: number;
 }
 
-function formIntento(f: Fuente, ultimo: Intento | undefined): string {
-  const capInicial = ultimo?.capitulo ?? f.capitulos[0]?.id ?? '';
-  const selectorCap = f.capitulos.length
-    ? `<select name="capitulo" required>${f.capitulos.map((c) => `<option value="${esc(c.id)}"${c.id === capInicial ? ' selected' : ''}>${esc(`${c.id}. ${c.titulo}`)}</option>`).join('')}</select>`
-    : `<input name="capitulo" required value="${esc(capInicial)}" placeholder="Capítulo">`;
+let filtroBloque = 'todos';
+let estadoActual: EstadoAcordeon | null = null;
+
+function asegurarEstado(reto: Reto): EstadoAcordeon {
+  if (!estadoActual || estadoActual.retoId !== reto.id) {
+    estadoActual = {
+      retoId: reto.id,
+      paso: 1,
+      opcionElegida: '',
+      logica: '',
+      pistaDesbloqueada: false,
+      inicioMs: Date.now(),
+    };
+  }
+  return estadoActual;
+}
+
+function retoActivo(ctx: Ctx): Reto {
+  const [modo, id] = (ctx.sub ?? '').split('/');
+  if (modo === 'reto' && id) {
+    const buscado = CATALOGO_RETOS.find((r) => r.id === id);
+    if (buscado) return buscado;
+  }
+  if (estadoActual) {
+    const enCurso = CATALOGO_RETOS.find((r) => r.id === estadoActual?.retoId);
+    if (enCurso && (filtroBloque === 'todos' || enCurso.bloque === filtroBloque)) {
+      return enCurso;
+    }
+  }
+  return siguienteRetoPendiente(ctx.datos.intentos, filtroBloque);
+}
+
+function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoIntento | null): string {
+  const bloque = BLOQUES_RETOS.find((b) => b.id === reto.bloque);
+  const tagPrevio = estadoPrevio
+    ? `<span class="tag e-${estadoPrevio}">${esc(ETIQUETA_ESTADO[estadoPrevio])}</span>`
+    : '<span class="tag">Pendiente</span>';
+
+  const bloqueOpciones = reto.opciones
+    .map((op) => {
+      const checked = est.opcionElegida === op.id ? ' checked' : '';
+      const disabled = est.paso === 3 || (est.paso === 2 && !est.pistaDesbloqueada) ? ' disabled' : '';
+      let claseExtra = '';
+      if (est.paso === 3) {
+        if (op.id === reto.opcionCorrecta) claseExtra = ' op-correcta';
+        else if (op.id === est.opcionElegida) claseExtra = ' op-trampa';
+      }
+      return `
+        <label class="reto-opcion${claseExtra}">
+          <input type="radio" name="opcion" value="${esc(op.id)}"${checked}${disabled} required>
+          <span class="op-letra">${esc(op.id)}</span>
+          <span class="op-texto">${esc(op.texto)}</span>
+        </label>`;
+    })
+    .join('');
+
+  const paso1Acciones =
+    est.paso === 1
+      ? `<div class="acciones">
+           <button type="submit" class="btn primario">[ Fijar mi jugada ]</button>
+         </div>`
+      : '';
+
+  const paso2 =
+    est.paso >= 2
+      ? `<div class="reto-paso">
+           <div class="lbl">Paso 2 · Andamiaje opcional</div>
+           <p class="m-sub">Jugada fijada: <b>Opción ${esc(est.opcionElegida)}</b>${est.logica ? ` · «${esc(est.logica)}»` : ''}</p>
+           ${
+             est.pistaDesbloqueada
+               ? `<div class="reto-pista"><b>Pista desbloqueada:</b> ${esc(reto.pista)}<p class="m-sub">Si has detectado el fallo, puedes cambiar la opción marcada arriba antes de ver la resolución.</p></div>`
+               : ''
+           }
+           ${
+             est.paso === 2
+               ? `<div class="acciones">
+                    ${!est.pistaDesbloqueada ? `<button type="button" class="btn" data-accion="desbloquear-pista">[ Desbloquear pista ]</button>` : ''}
+                    <button type="button" class="btn primario" data-accion="ver-resolucion">[ Ver resolución ]</button>
+                  </div>`
+               : ''
+           }
+         </div>`
+      : '';
+
+  const acertada = est.opcionElegida === reto.opcionCorrecta;
+  const paso3 =
+    est.paso === 3
+      ? `<div class="reto-paso reto-resolucion">
+           <div class="lbl">Paso 3 · Choque con la realidad</div>
+           <div class="reto-veredicto ${acertada ? 'ok' : 'trampa'}">
+             <b>${acertada ? '¡Diste en el clavo!' : `Caíste en la trampa intuitiva (elegiste ${esc(est.opcionElegida)}, la mejor jugada es ${esc(reto.opcionCorrecta)})`}</b>
+           </div>
+           <div class="reto-explicacion">
+             <p>${esc(reto.solucion)}</p>
+           </div>
+           <div class="reto-modelo">
+             <span class="lbl">Modelo mental accionable (reverso FSRS)</span>
+             <p><b>${esc(reto.modeloMental)}</b></p>
+           </div>
+           <div class="acciones reto-cierre">
+             <button type="button" class="btn ${acertada && !est.pistaDesbloqueada ? 'primario' : ''}" data-accion="guardar-reto" data-estado="sin_ayuda">[ Lo clavé sin ayuda ]</button>
+             <button type="button" class="btn ${est.pistaDesbloqueada && acertada ? 'primario' : ''}" data-accion="guardar-reto" data-estado="con_pista">[ Necesité la pista ]</button>
+             <button type="button" class="btn ${!acertada ? 'primario' : ''}" data-accion="guardar-reto" data-estado="solucion">[ Caí en la trampa · Crear tarjeta de repaso ]</button>
+           </div>
+         </div>`
+      : '';
+
   return `
-    <form class="panel form-bloque" data-accion="intento">
-      <div class="fila">
-        <label class="campo">Capítulo${selectorCap}</label>
-        <label class="campo">Ejercicio<input name="ejercicio" required placeholder="p. ej. 2.14" autocomplete="off"></label>
-        <label class="campo corto-v">Minutos<input name="minutos" type="number" min="0" max="600" inputmode="numeric" placeholder="0"></label>
-      </div>
-      <fieldset class="seg-radio estados"><legend>Resultado</legend>
-        ${ESTADOS.map((e, i) => `<label class="e-${e}"><input type="radio" name="estado" value="${e}" required${i === 0 ? ' checked' : ''}> ${esc(ETIQUETA_ESTADO[e])}</label>`).join('')}
-      </fieldset>
-      <label class="campo">Nota breve sobre el error<textarea name="nota" rows="2" placeholder="Qué falló o qué idea faltaba (opcional)"></textarea></label>
-      <div class="acciones"><button class="btn primario">Registrar intento</button></div>
-    </form>`;
+    <article class="panel reto-ring">
+      <header class="reto-head">
+        <div>
+          <span class="lbl">Bloque ${esc(reto.bloque)} · ${esc(bloque?.titulo ?? '')} · Reto ${esc(reto.id)}</span>
+          <h2 class="reto-titulo">${esc(reto.titulo)}</h2>
+        </div>
+        ${tagPrevio}
+      </header>
+      <p class="reto-escenario">${esc(reto.escenario)}</p>
+      <form class="form-bloque" data-accion="fijar-jugada">
+        <div class="lbl">Paso 1 · Compromiso y jugada inicial</div>
+        <div class="reto-opciones">${bloqueOpciones}</div>
+        <label class="campo">
+          ¿Cuál es tu lógica? (1 línea, opcional)
+          <input name="logica" value="${esc(est.logica)}" placeholder="Por qué eliges esta jugada y qué trampa descartas…" autocomplete="off"${est.paso > 1 ? ' readonly' : ''}>
+        </label>
+        ${paso1Acciones}
+      </form>
+      ${paso2}
+      ${paso3}
+    </article>`;
 }
 
 function filaIntento(ctx: Ctx, i: Intento): string {
-  const tarjeta = ctx.datos.tarjetas.find((t) => !t.borrado && t.origen?.coleccion === 'intentos' && t.origen.id === i.id);
+  const reto = CATALOGO_RETOS.find((r) => r.id === i.ejercicio);
+  const titulo = reto ? `${reto.id} · ${reto.titulo}` : `Bloque ${i.capitulo} · Reto ${i.ejercicio}`;
+  const tarjeta = ctx.datos.tarjetas.find((t) => !t.borrado && (t.id === i.tarjetaId || (t.origen?.coleccion === 'intentos' && t.origen.id === i.id)));
   const crear = i.estado !== 'sin_ayuda' && !tarjeta ? `<a class="btn sutil" href="#repaso/nueva/intentos/${esc(i.id)}">Crear tarjeta</a>` : '';
   return `
     <li>
       <div class="li-main">
-        <b>Cap. ${esc(i.capitulo)} · ej. ${esc(i.ejercicio)} <span class="tag e-${i.estado}">${esc(ETIQUETA_ESTADO[i.estado])}</span></b>
+        <b>${esc(titulo)} <span class="tag e-${i.estado}">${esc(ETIQUETA_ESTADO[i.estado])}</span></b>
         ${i.notaError ? `<span>${esc(i.notaError)}</span>` : ''}
-        <span class="m-sub">${esc(fmtRelativo(i.dia, ctx.hoy))}${i.segundos ? ` · ${esc(fmtDuracion(i.segundos))}` : ''}${tarjeta ? ' · con tarjeta' : ''}</span>
+        <span class="m-sub">${esc(fmtRelativo(i.dia, ctx.hoy))}${i.segundos ? ` · ${esc(fmtDuracion(i.segundos))}` : ''}${tarjeta ? ' · con tarjeta FSRS' : ''}</span>
       </div>
       <div class="li-acc">${crear}<button class="btn sutil" data-accion="borrar-intento" data-id="${esc(i.id)}">Borrar</button></div>
     </li>`;
 }
 
 export const estudio: Vista = {
-  titulo: 'Estudio',
+  titulo: 'Retos',
   render(ctx) {
-    const fuentes = ctx.datos.fuentes.filter((f) => !f.borrado);
-    const f = fuenteActual(ctx);
-    if (!f) return `<section class="view">${cabecera('Estudio')}${vacio('No hay fuentes de estudio.')}</section>`;
-    const intentos = ctx.datos.intentos.filter((i) => !i.borrado && i.fuenteId === f.id).sort((a, b) => b.creado.localeCompare(a.creado));
-    const progreso = progresoPorCapitulo(f, intentos);
-    const url = urlSegura(f.url);
-    const filasCap = progreso.map((p) => `
-      <tr>
-        <th scope="row">${esc(p.capitulo)}</th><td class="t-cap">${esc(p.titulo)}</td>
-        <td class="num">${p.intentados}</td><td class="num">${p.sinAyuda}</td>
-        <td class="num"><input class="mini" type="number" min="0" max="999" value="${p.total ?? ''}" data-accion="total" data-cap="${esc(p.capitulo)}" aria-label="${esc(`Ejercicios del capítulo ${p.capitulo}`)}" placeholder="—"></td>
-      </tr>`).join('');
+    const fuente = fuenteRetos(ctx.ahora);
+    const intentos = ctx.datos.intentos.filter((i) => !i.borrado).sort((a, b) => b.creado.localeCompare(a.creado));
+    const desglose = desgloseResolucion(intentos);
+    const progreso = progresoPorCapitulo(fuente, intentos);
+    const reto = retoActivo(ctx);
+    const est = asegurarEstado(reto);
+    const estadoPrevio = estadoDeReto(reto.id, intentos);
+
+    const bloquesFiltro = [
+      { id: 'todos', texto: 'Todos los bloques' },
+      ...BLOQUES_RETOS.map((b) => ({ id: b.id, texto: `${b.id}. ${b.titulo}` })),
+    ];
+
+    const catalogoHtml = BLOQUES_RETOS.map((b) => {
+      const retosBloque = CATALOGO_RETOS.filter((r) => r.bloque === b.id);
+      const prog = progreso.find((p) => p.capitulo === b.id);
+      return `
+        <div class="panel bloque-cat">
+          <div class="bloque-head">
+            <div>
+              <span class="lbl">Bloque ${esc(b.id)}</span>
+              <h3>${esc(b.titulo)}</h3>
+              <p class="m-sub">${esc(b.descripcion)}</p>
+            </div>
+            <span class="estado">${prog ? `${prog.sinAyuda}/${prog.total ?? retosBloque.length} sin ayuda` : `0/${retosBloque.length}`}</span>
+          </div>
+          <ul class="lista">
+            ${retosBloque
+              .map((r) => {
+                const st = estadoDeReto(r.id, intentos);
+                const activo = r.id === reto.id;
+                return `
+                  <li>
+                    <div class="li-main">
+                      <b>${esc(r.id)} · ${esc(r.titulo)} ${st ? `<span class="tag e-${st}">${esc(ETIQUETA_ESTADO[st])}</span>` : '<span class="tag">Pendiente</span>'}</b>
+                    </div>
+                    <div class="li-acc">
+                      <button class="btn ${activo ? 'primario' : 'sutil'}" data-accion="elegir-reto" data-id="${esc(r.id)}">${activo ? 'En juego' : st ? 'Rejugar' : 'Jugar'}</button>
+                    </div>
+                  </li>`;
+              })
+              .join('')}
+          </ul>
+        </div>`;
+    }).join('');
+
     return `
       <section class="view">
-        ${cabecera('Estudio', 'Resuelve cada ejercicio antes de mirar la solución, sin IA. Aquí sólo se registra.')}
-        <div class="fuentes seg" role="group" aria-label="Fuente">
-          ${fuentes.map((x) => `<button class="seg-btn" data-accion="fuente" data-id="${esc(x.id)}" aria-pressed="${x.id === f.id}">${esc(x.titulo.split(' (')[0] ?? x.titulo)}</button>`).join('')}
-        </div>
-        ${url ? `<p class="note"><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Abrir ${esc(f.titulo)} ↗</a></p>` : ''}
+        ${cabecera('Retos Estratégicos', 'Ring de sparring: compromete tu jugada antes de ver la pista o la solución.')}
 
-        <h2 class="sec">Registrar un intento</h2>
-        ${formIntento(f, intentos[0])}
+        <div class="fuentes seg" role="group" aria-label="Filtrar por bloque">
+          ${bloquesFiltro.map((b) => `<button class="seg-btn" data-accion="filtrar-bloque" data-bloque="${esc(b.id)}" aria-pressed="${filtroBloque === b.id}">${esc(b.texto)}</button>`).join('')}
+        </div>
+
+        <h2 class="sec">Siguiente reto pendiente</h2>
+        ${renderAcordeon(reto, est, estadoPrevio)}
+
+        <h2 class="sec">Catálogo integrado (${CATALOGO_RETOS.length} retos · ${BLOQUES_RETOS.length} bloques)</h2>
+        <p class="note">Tasa global sin ayuda: <b>${fmtPct(desglose.tasaSinAyuda)}</b> (${plural(desglose.total, 'intento registrado', 'intentos registrados')}: ${desglose.sinAyuda} sin ayuda, ${desglose.conPista} con pista, ${desglose.solucion} mirando solución).</p>
+        <div class="form-bloque">${catalogoHtml}</div>
 
         <h2 class="sec">Últimos intentos</h2>
-        ${intentos.length ? `<ul class="lista">${intentos.slice(0, 20).map((i) => filaIntento(ctx, i)).join('')}</ul>` : vacio('Aún no hay intentos en esta fuente.')}
-
-        <h2 class="sec">Progreso por capítulo</h2>
-        <div class="panel">
-          <p class="estado-sync">Sin ayuda: ${fmtPct(proporcionSinAyuda(intentos))} de ${plural(intentos.length, 'intento')}. El estado de cada ejercicio es el de su último intento.</p>
-          ${progreso.length ? `<div class="table-wrap"><table class="plan cap"><thead><tr><th>#</th><th class="t-cap">Capítulo</th><th>Intentados</th><th>Sin ayuda</th><th>Total</th></tr></thead><tbody>${filasCap}</tbody></table></div>` : ''}
-          <form class="form-linea" data-accion="capitulo">
-            <label class="sr-only" for="cap-id">Número</label><input id="cap-id" name="id" required placeholder="Nº" class="mini">
-            <label class="sr-only" for="cap-titulo">Título</label><input id="cap-titulo" name="titulo" required placeholder="Título del capítulo">
-            <button class="btn">Añadir capítulo</button>
-          </form>
-        </div>
+        ${intentos.length ? `<ul class="lista">${intentos.slice(0, 20).map((i) => filaIntento(ctx, i)).join('')}</ul>` : vacio('Aún no has completado ningún reto.')}
       </section>`;
   },
   montar(ctx, raiz) {
-    accion(raiz, 'click', 'fuente', (b) => {
-      try { localStorage.setItem(CLAVE_FUENTE, b.dataset.id ?? ''); } catch { /* sin preferencia guardada */ }
+    accion(raiz, 'click', 'filtrar-bloque', (b) => {
+      filtroBloque = b.dataset.bloque ?? 'todos';
+      const sig = siguienteRetoPendiente(ctx.datos.intentos, filtroBloque);
+      estadoActual = {
+        retoId: sig.id,
+        paso: 1,
+        opcionElegida: '',
+        logica: '',
+        pistaDesbloqueada: false,
+        inicioMs: Date.now(),
+      };
+      if (ctx.sub) ctx.ir('#estudio');
+      else ctx.pintar();
+    });
+
+    accion(raiz, 'click', 'elegir-reto', (b) => {
+      const id = b.dataset.id ?? '';
+      const buscado = CATALOGO_RETOS.find((r) => r.id === id);
+      if (!buscado) return;
+      estadoActual = {
+        retoId: buscado.id,
+        paso: 1,
+        opcionElegida: '',
+        logica: '',
+        pistaDesbloqueada: false,
+        inicioMs: Date.now(),
+      };
+      if (ctx.sub) ctx.ir('#estudio');
+      else ctx.pintar();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    accion(raiz, 'change', 'fijar-jugada', (form) => {
+      if (!estadoActual || estadoActual.paso !== 2 || !estadoActual.pistaDesbloqueada) return;
+      const v = campos(form as HTMLFormElement);
+      if (v.opcion) estadoActual.opcionElegida = v.opcion;
+    });
+
+    accion(raiz, 'submit', 'fijar-jugada', (form, e) => {
+      e.preventDefault();
+      const reto = retoActivo(ctx);
+      const est = asegurarEstado(reto);
+      const v = campos(form as HTMLFormElement);
+      if (!v.opcion) return ctx.avisar('Selecciona una opción antes de fijar tu jugada.', 'error');
+      est.opcionElegida = v.opcion;
+      est.logica = v.logica ?? '';
+      est.paso = 2;
       ctx.pintar();
     });
-    accion(raiz, 'submit', 'intento', async (form, e) => {
-      e.preventDefault();
-      const f = fuenteActual(ctx);
-      if (!f) return;
-      const v = campos(form as HTMLFormElement);
-      const segundos = Math.round((Number(v.minutos) || 0) * 60);
-      const estado = (ESTADOS.includes(v.estado as EstadoIntento) ? v.estado : 'no_resuelto') as EstadoIntento;
-      const registro: Intento = nuevo({ fuenteId: f.id, capitulo: v.capitulo ?? '', ejercicio: v.ejercicio ?? '', estado, segundos, notaError: v.nota ?? '', dia: ctx.hoy }, new Date());
-      await ctx.guardar({ coleccion: 'intentos', registro });
-      await ctx.registrar('estudio', segundos);
-      ctx.avisar(estado === 'sin_ayuda' ? 'Intento registrado.' : 'Intento registrado. Puedes crear una tarjeta desde la lista.');
-      raiz.querySelector<HTMLInputElement>('input[name="ejercicio"]')?.focus();
+
+    accion(raiz, 'click', 'desbloquear-pista', () => {
+      const reto = retoActivo(ctx);
+      const est = asegurarEstado(reto);
+      est.pistaDesbloqueada = true;
+      ctx.pintar();
     });
+
+    accion(raiz, 'click', 'ver-resolucion', () => {
+      const reto = retoActivo(ctx);
+      const est = asegurarEstado(reto);
+      const radio = raiz.querySelector<HTMLInputElement>('input[name="opcion"]:checked');
+      if (radio?.value) est.opcionElegida = radio.value;
+      est.paso = 3;
+      ctx.pintar();
+    });
+
+    accion(raiz, 'click', 'guardar-reto', async (b) => {
+      const reto = retoActivo(ctx);
+      const est = asegurarEstado(reto);
+      const estado = (b.dataset.estado ?? 'sin_ayuda') as EstadoIntento;
+      const ahora = new Date();
+      const segundos = Math.max(5, Math.round((Date.now() - est.inicioMs) / 1000));
+      const resumenJugada = [
+        `Jugada: ${est.opcionElegida || '—'} (correcta: ${reto.opcionCorrecta})`,
+        est.logica ? `Lógica: ${est.logica}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ');
+
+      const intentoBase: Intento = nuevo(
+        {
+          fuenteId: ID_FUENTE_RETOS,
+          capitulo: reto.bloque,
+          ejercicio: reto.id,
+          estado,
+          segundos,
+          notaError: resumenJugada,
+          dia: ctx.hoy,
+        },
+        ahora,
+      );
+
+      if (estado === 'solucion') {
+        const anverso = `[Reto ${reto.id} · ${reto.titulo}]\n${reto.escenario}`;
+        const reverso = `${reto.modeloMental}\n\nClave: ${reto.solucion}`;
+        const tarjeta = nuevaTarjeta(anverso, reverso, ahora, { coleccion: 'intentos', id: intentoBase.id });
+        const intentoConTarjeta: Intento = { ...intentoBase, tarjetaId: tarjeta.id };
+        await ctx.guardar(
+          { coleccion: 'intentos', registro: intentoConTarjeta },
+          { coleccion: 'tarjetas', registro: tarjeta },
+        );
+      } else {
+        await ctx.guardar({ coleccion: 'intentos', registro: intentoBase });
+      }
+
+      await ctx.registrar('estudio', segundos);
+
+      const siguiente = siguienteRetoPendiente(ctx.datos.intentos, filtroBloque);
+      estadoActual = {
+        retoId: siguiente.id,
+        paso: 1,
+        opcionElegida: '',
+        logica: '',
+        pistaDesbloqueada: false,
+        inicioMs: Date.now(),
+      };
+
+      ctx.avisar(
+        estado === 'solucion'
+          ? 'Reto registrado y tarjeta FSRS creada con el modelo mental.'
+          : 'Reto completado y sesión del día registrada.',
+      );
+      if (ctx.sub) ctx.ir('#estudio');
+      else ctx.pintar();
+    });
+
     accion(raiz, 'click', 'borrar-intento', async (b) => {
       const i = ctx.datos.intentos.find((x) => x.id === b.dataset.id);
-      if (!i || !confirm(`¿Borrar el intento del ejercicio ${i.ejercicio}?`)) return;
+      if (!i || !confirm(`¿Borrar el intento del reto ${i.ejercicio}?`)) return;
       await ctx.guardar({ coleccion: 'intentos', registro: borrar(i, new Date()) });
-    });
-    accion(raiz, 'change', 'total', async (el) => {
-      const f = fuenteActual(ctx);
-      if (!f) return;
-      const n = Number((el as HTMLInputElement).value);
-      const capitulos = f.capitulos.map((c) => {
-        if (c.id !== el.dataset.cap) return c;
-        return n > 0 ? { ...c, ejercicios: Math.round(n) } : { id: c.id, titulo: c.titulo };
-      });
-      await ctx.guardar({ coleccion: 'fuentes', registro: actualizar(f, { capitulos }, new Date()) });
-    });
-    accion(raiz, 'submit', 'capitulo', async (form, e) => {
-      e.preventDefault();
-      const f = fuenteActual(ctx);
-      const { id = '', titulo = '' } = campos(form as HTMLFormElement);
-      if (!f || !id || f.capitulos.some((c) => c.id === id)) return ctx.avisar('Ese capítulo ya existe.', 'error');
-      await ctx.guardar({ coleccion: 'fuentes', registro: actualizar(f, { capitulos: [...f.capitulos, { id, titulo }] }, new Date()) });
     });
   },
 };

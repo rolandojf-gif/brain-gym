@@ -1,18 +1,25 @@
 # BRAIN.GYM
 
-Web personal de un solo usuario para sostener una rutina de entrenamiento cognitivo: estudio de probabilidad y estadística, lectura con escritura, repetición espaciada y calibración. El brief completo está en `docs/brief.md`; las decisiones, en `docs/decisiones.md`; la arquitectura y el modelo de datos, en `docs/arquitectura.md`. Léelos antes de cambiar algo de fondo.
+Web personal de un solo usuario para sostener un entrenamiento cognitivo ágil, diario y de baja fricción centrado en **Teoría de Juegos, Diseño de Incentivos, Paradojas de Decisión y Modelos Mentales**, apoyado en **Extracción Quirúrgica de Lecturas (3x1)** y **Repetición Espaciada (FSRS)**. El brief completo está en `docs/brief.md`; las decisiones, en `docs/decisiones.md`; la arquitectura y el modelo de datos, en `docs/arquitectura.md`. Léelos antes de cambiar algo de fondo.
 
 ## Principios (no negociables)
 
-1. La herramienta sirve a la rutina. Recorrido mínimo: abrir → ver la sesión de hoy → hacerla → cerrar. Si algo añade fricción, sobra.
+1. La herramienta sirve a la rutina (Sprint Diario de 10 min). Recorrido mínimo: abrir → ver el sprint de hoy → ejecutarlo → cerrar. Si algo añade fricción, sobra.
 2. Sin gamificación: ni puntos, ni insignias, ni rachas como premio, ni notificaciones insistentes. La continuidad se muestra como dato. Sólo métricas que midan algo real.
-3. Primero piensa el usuario, luego la IA. La IA nunca da resumen, solución ni respuesta antes del intento; su feedback llega después y como crítica, nunca como reescritura.
-4. No reconstruir contenido existente: se enlaza y se registra. No se guarda el texto de los artículos; sólo URL, metadatos y notas propias.
+3. Primero piensa el usuario, luego la resolución. En el ring de retos el usuario compromete su jugada antes de desbloquear la pista o ver el equilibrio/trampa.
+4. No almacenar contenido externo innecesario: en lecturas sólo se guarda URL, metadatos y la extracción 3x1 propia.
 5. Simplicidad: un usuario, cada dependencia justificada por una necesidad concreta.
-6. Los datos son del usuario: exportación e importación completas siempre funcionando.
-7. Interfaz en español.
+6. Los datos son del usuario: exportación e importación completas siempre funcionando y retrocompatibles.
+7. Interfaz en español impecable, directo y sin paja.
 
-Fuera de alcance: ejercicios generados por IA, multiusuario, mecánicas de juego. No se empieza una fase sin una semana de uso real de la anterior.
+## Navegación (6 pestañas)
+
+- `01 Hoy` (`#hoy`): Sprint Diario (10 min) en 3 bloques (1º Calentamiento FSRS, 2º Reto del Día o Lectura 3x1, 3º Cierre rápido de modelo mental).
+- `02 Retos` (`#estudio`): Ring de sparring interactivo con el catálogo integrado de 16 retos en 4 bloques temáticos y acordeón de 3 pasos.
+- `03 Lectura` (`#lectura`): Extracción Quirúrgica 3x1 (Tesis central, Mecanismo/Incentivo, Punto ciego/Objeción; máx. ~40 palabras por campo).
+- `04 Repaso` (`#repaso`): Mazo FSRS (`ts-fsrs`) alimentado desde los retos fallados, lecturas y aprendizajes diarios.
+- `05 Progreso` (`#progreso`): Continuidad real (12 semanas), tasa de resolución de retos por bloque (`sin_ayuda`, `con_pista`, `solucion`), madurez FSRS y síntesis 3x1.
+- `06 Datos` (`#datos`): Sincronización entre dispositivos, exportación/importación JSON y plan semanal.
 
 ## Stack
 
@@ -39,9 +46,9 @@ Variable de entorno en Netlify: `BG_TOKEN` (mínimo 32 caracteres; generar con `
 - Funciones de Netlify en `netlify/functions/*.mts`; sus tests en `netlify/*.test.ts`, **nunca** dentro de `netlify/functions` (Netlify publicaría cualquier archivo de esa carpeta como función). La lógica va en `src/dominio` para probarla sin Netlify.
 - Tests de IndexedDB con `fake-indexeddb`.
 - PWA: `public/manifest.webmanifest` y `public/sw.js` (escrito a mano, sin dependencias). Si cambia la lista de archivos base o la estrategia del service worker, subir `CACHE` (`bg-vN`). El service worker sólo se registra en producción.
-- Lógica de dominio con tests obligatorios: FSRS, Brier, calibración, sesión del día, migraciones, fusión de sincronización.
-- Nombres de dominio en español (`sesionDeHoy`, `intentos`, `predicciones`); el código de librerías externas, como venga.
-- Modelo de datos versionado: cualquier cambio de forma lleva una migración pura nueva con su test (ver `docs/arquitectura.md`). Nunca editar una migración ya publicada.
+- Lógica de dominio con tests obligatorios: FSRS, catálogo de retos, estudio, sesión del día, migraciones, fusión de sincronización.
+- Nombres de dominio en español (`sesionDeHoy`, `intentos`, `CATALOGO_RETOS`); el código de librerías externas, como venga.
+- Modelo de datos versionado: se conserva el almacén `predicciones` por retrocompatibilidad con exportaciones y sincronizaciones existentes aunque el módulo de calibración no esté en la interfaz activa.
 - Fechas en ISO 8601. El «día» de la rutina es el día lógico de `src/lib/dia.ts` (corte a las 04:00).
 - Comentarios en español, breves, que expliquen el porqué.
 
