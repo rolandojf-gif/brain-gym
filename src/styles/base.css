@@ -151,7 +151,8 @@ label { font: 700 11.5px/1.3 var(--f-mono); text-transform: uppercase; letter-sp
 .form-bloque > * { min-width: 0; }
 input[type="file"] { width: 100%; font-size: 14px; }
 .form-bloque .fila { display: flex; flex-wrap: wrap; gap: 12px; }
-.campo { display: flex; flex-direction: column; gap: 5px; flex: 1 1 180px; }
+.campo { display: flex; flex-direction: column; gap: 5px; flex: 1 1 180px; min-width: 0; }
+.campo select, .campo input:not([type="checkbox"]):not([type="radio"]), .campo textarea { width: 100%; }
 .campo.corto { flex: 0 1 auto; flex-direction: row; align-items: center; gap: 8px; margin: 14px 0; }
 .campo.corto input { width: 70px; }
 fieldset { border: 2px solid var(--line); padding: 8px 12px 10px; margin: 0; min-width: 0; }
@@ -224,6 +225,21 @@ table.plan thead th { font: 700 11px var(--f-mono); text-transform: uppercase; b
 .li-acc { display: flex; gap: 8px; flex-wrap: wrap; }
 .li-acc .btn { min-height: 34px; padding: 6px 10px; font-size: 11px; }
 .m-sub { font: 400 12px/1.4 var(--f-mono); color: var(--muted); }
+
+/* ── Estudio ──────────────────────────────────────────────────────────── */
+.fuentes { margin-bottom: 4px; }
+.campo.corto-v { flex: 0 1 110px; }
+input.mini { width: 72px; min-height: 34px; padding: 4px 6px; font-size: 14px; }
+.estados label { border: 2px solid var(--ink); padding: 6px 10px; background: var(--card); }
+.estados label:has(input:checked) { background: var(--lime); color: #121211; }
+.tag { display: inline-block; font: 700 10px/1 var(--f-mono); text-transform: uppercase; padding: 3px 5px; border: 2px solid var(--ink); vertical-align: 2px; margin-left: 4px; }
+.tag.e-sin_ayuda { background: var(--lime); color: #121211; }
+.tag.e-con_pista { background: var(--card-2); }
+.tag.e-solucion { background: var(--orange); color: #121211; }
+.tag.e-no_resuelto { background: var(--asphalt); color: #E8E7E1; }
+table.cap td.num, table.cap th { text-align: center; }
+table.cap .t-cap { text-align: left; }
+table.cap td { padding: 6px 8px; }
 
 /* ── Móvil: la marca y el tema en una fila, las pestañas a todo el ancho y desplazables. ── */
 @media (max-width: 720px) {
