@@ -2,7 +2,8 @@
 import { diaLogico, diaSemana } from '../lib/dia';
 import { porResolver } from './calibracion';
 import { vencidas } from './fsrs';
-import type { Actividad, Ajustes, Colecciones, Prediccion, Tarjeta } from './tipos';
+import { nuevo } from './registro';
+import type { Actividad, Ajustes, Colecciones, Prediccion, Sesion, Tarjeta } from './tipos';
 
 export interface SesionDeHoy {
   dia: string;
@@ -42,4 +43,19 @@ export function sumarDias(dia: string, n: number): string {
   const d = new Date(`${dia}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
+}
+
+/* Una sesión por día y actividad, con id fijo: si se registra desde los dos dispositivos, la sincronización la funde
+   en un solo registro en lugar de duplicarla. */
+export function idSesion(dia: string, actividad: Actividad): string {
+  return `sesion:${dia}:${actividad}`;
+}
+
+/** Marca una actividad como hecha hoy y le suma el tiempo dedicado (si se midió). */
+export function registrarSesion(existente: Sesion | undefined, dia: string, actividad: Actividad, segundos: number, ahora: Date): Sesion {
+  const iso = ahora.toISOString();
+  if (existente) {
+    return { ...existente, borrado: false, segundos: existente.segundos + segundos, fin: iso, actualizado: iso };
+  }
+  return nuevo({ dia, actividad, inicio: iso, fin: iso, segundos }, ahora, idSesion(dia, actividad));
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ajustesPorDefecto } from './ajustes';
 import { nuevaTarjeta } from './fsrs';
 import { nuevo } from './registro';
-import { sesionDeHoy, sumarDias } from './sesion';
+import { idSesion, registrarSesion, sesionDeHoy, sumarDias } from './sesion';
 import type { Actividad, Sesion } from './tipos';
 
 // Fechas en hora local: el día lógico depende de la zona del dispositivo.
@@ -72,5 +72,15 @@ describe('sumarDias', () => {
     expect(sumarDias('2026-10-31', 1)).toBe('2026-11-01');
     expect(sumarDias('2027-01-01', -1)).toBe('2026-12-31');
     expect(sumarDias('2026-10-25', 1)).toBe('2026-10-26');
+  });
+});
+
+describe('registrarSesion', () => {
+  it('crea la sesión del día con id fijo y acumula tiempo', () => {
+    const a = registrarSesion(undefined, '2026-10-26', 'estudio', 600, lunes);
+    expect(a.id).toBe(idSesion('2026-10-26', 'estudio'));
+    const b = registrarSesion(a, '2026-10-26', 'estudio', 300, new Date(lunes.getTime() + 1000));
+    expect(b.segundos).toBe(900);
+    expect(b.actualizado > a.actualizado).toBe(true);
   });
 });
