@@ -60,3 +60,19 @@ export function porResolver(predicciones: readonly Prediccion[], hoy: string): P
     .filter((p) => !p.borrado && !p.resolucion && p.venceEl.slice(0, 10) <= hoy)
     .sort((a, b) => a.venceEl.localeCompare(b.venceEl));
 }
+
+/** Brier por categoría, de más a menos predicciones resueltas. */
+export function brierPorCategoria(predicciones: readonly Prediccion[]): { categoria: string; n: number; brier: number | null }[] {
+  const grupos = new Map<string, Prediccion[]>();
+  for (const p of predicciones) {
+    const c = p.categoria || 'Sin categoría';
+    grupos.set(c, [...(grupos.get(c) ?? []), p]);
+  }
+  return [...grupos.entries()]
+    .map(([categoria, ps]) => {
+      const rs = resueltas(ps);
+      return { categoria, n: rs.length, brier: brier(rs) };
+    })
+    .filter((g) => g.n > 0)
+    .sort((a, b) => b.n - a.n || a.categoria.localeCompare(b.categoria));
+}

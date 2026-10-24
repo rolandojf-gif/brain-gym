@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { brier, curva, porResolver, resueltas } from './calibracion';
+import { brier, brierPorCategoria, curva, porResolver, resueltas } from './calibracion';
 import { nuevo } from './registro';
 import type { Prediccion, Resultado } from './tipos';
 
@@ -56,5 +56,17 @@ describe('porResolver', () => {
   it('sólo las vencidas hasta hoy y sin resolver, la más antigua primero', () => {
     const lista = [pred(0.5, undefined, '2026-11-03'), pred(0.5, undefined, '2026-10-30'), pred(0.5, 'si', '2026-10-01'), pred(0.5, undefined, '2026-11-01')];
     expect(porResolver(lista, '2026-11-01').map((p) => p.venceEl)).toEqual(['2026-10-30', '2026-11-01']);
+  });
+});
+
+describe('brierPorCategoria', () => {
+  it('agrupa, ignora categorías sin resueltas y ordena por número', () => {
+    const conCat = (p: Prediccion, categoria: string) => ({ ...p, categoria });
+    const g = brierPorCategoria([
+      conCat(pred(0.9, 'si'), 'trabajo'), conCat(pred(0.6, 'no'), 'trabajo'),
+      conCat(pred(0.5, 'si'), 'política'), conCat(pred(0.7), 'ciencia'),
+    ]);
+    expect(g.map((x) => x.categoria)).toEqual(['trabajo', 'política']);
+    expect(g[0]?.brier).toBeCloseTo((0.01 + 0.36) / 2, 10);
   });
 });

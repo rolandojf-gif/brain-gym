@@ -253,6 +253,20 @@ table.cap td { padding: 6px 8px; }
 .escrito h2.sec:first-child { margin-top: 0; }
 .escrito p { font-size: 16.5px; line-height: 1.65; }
 
+/* ── Calibración ──────────────────────────────────────────────────────── */
+.graf-cal { margin-top: 18px; max-width: 520px; }
+.graf-cal svg { display: block; width: 100%; height: auto; }
+.graf-cal .rejilla { stroke: var(--line); }
+.graf-cal .eje { fill: var(--muted); font: 10.5px var(--f-mono); }
+.graf-cal .ideal { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.graf-cal .traza { fill: none; stroke: var(--orange); stroke-width: 2; }
+.graf-cal .punto { fill: var(--orange); stroke: var(--ink); stroke-width: 2; }
+.resolver-antes { display: inline-block; }
+.resolver-antes summary { list-style: none; }
+.resolver-antes summary::-webkit-details-marker { display: none; }
+.resolver-antes[open] > div { display: flex; gap: 8px; margin-top: 8px; }
+.table-wrap.panel { margin-top: 18px; }
+
 /* ── Móvil: la marca y el tema en una fila, las pestañas a todo el ancho y desplazables. ── */
 @media (max-width: 720px) {
   .topnav { padding: 10px 14px; gap: 10px; }

@@ -6,6 +6,7 @@ import { fmtReloj } from './lib/fmt';
 import { esc } from './lib/html';
 import * as temporizador from './lib/temporizador';
 import { NOMBRE_ACTIVIDAD } from './vistas/comun';
+import { calibracion } from './vistas/calibracion';
 import { datos } from './vistas/datos';
 import { estudio } from './vistas/estudio';
 import { hoy } from './vistas/hoy';
@@ -16,17 +17,12 @@ import { repaso } from './vistas/repaso';
 const $ = <T extends Element>(s: string) => document.querySelector<T>(s);
 const $$ = <T extends Element>(s: string) => [...document.querySelectorAll<T>(s)];
 
-const enConstruccion = (titulo: string): Vista => ({
-  titulo,
-  render: () => `<section class="view"><div class="view-head"><h1>${esc(titulo)}</h1></div><div class="empty">Este módulo llega en su propia rama de la Fase 1.</div></section>`,
-});
-
 const VISTAS: Record<string, Vista> = {
   hoy,
   estudio,
   lectura,
   repaso,
-  calibracion: enConstruccion('Calibración'),
+  calibracion,
   progreso,
   datos,
 };
@@ -86,6 +82,7 @@ function avisar(texto: string, tipo: 'ok' | 'error' = 'ok'): void {
   if (!caja) return;
   const el = Object.assign(document.createElement('div'), { className: `aviso ${tipo}`, textContent: texto });
   el.setAttribute('role', tipo === 'error' ? 'alert' : 'status');
+  while (caja.children.length >= 2) caja.firstElementChild?.remove();
   caja.append(el);
   setTimeout(() => el.remove(), tipo === 'error' ? 8000 : 3500);
 }
