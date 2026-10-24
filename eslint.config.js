@@ -14,4 +14,5 @@ export default tseslint.config(
     },
   },
   { files: ['netlify/**/*.mts'], languageOptions: { globals: { ...globals.node } } },
+  { files: ['public/sw.js'], languageOptions: { globals: { ...globals.serviceworker } } },
 );

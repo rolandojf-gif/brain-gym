@@ -131,6 +131,10 @@ async function main(): Promise<void> {
   setInterval(pintarEstado, 1000);
   pintar(true);
   void app.sincronizar();
+  // Sólo en producción: en desarrollo, la caché del service worker escondería los cambios.
+  if ('serviceWorker' in navigator && import.meta.env.PROD) {
+    navigator.serviceWorker.register('/sw.js').catch((e: unknown) => console.warn('Sin service worker:', e));
+  }
 }
 
 void main();
