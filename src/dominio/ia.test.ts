@@ -49,16 +49,13 @@ describe('ia (Abogado del Diablo)', () => {
     ).toThrow(/supera el límite de 3000 caracteres/);
   });
 
-  it('construye el payload con max_tokens: 1500 y omite response_format en modelos de Anthropic', () => {
+  it('construye el payload con el modelo por defecto deepseek/deepseek-v4.1-flash-1017 y max_tokens: 1500', () => {
     const p = { titulo: 'T', resumen: 'R', objecion: 'O' };
-    const claude = construirPayloadOpenRouter('anthropic/claude-3.5-sonnet', p);
-    expect(claude.max_tokens).toBe(MAX_TOKENS_IA);
-    expect(claude.max_tokens).toBe(1500);
-    expect(claude).not.toHaveProperty('response_format');
-
-    const gemini = construirPayloadOpenRouter('google/gemini-2.5-flash', p);
-    expect(gemini.max_tokens).toBe(1500);
-    expect(gemini.response_format).toEqual({ type: 'json_object' });
+    const payload = construirPayloadOpenRouter('deepseek/deepseek-v4.1-flash-1017', p);
+    expect(payload.model).toBe('deepseek/deepseek-v4.1-flash-1017');
+    expect(payload.max_tokens).toBe(MAX_TOKENS_IA);
+    expect(payload.max_tokens).toBe(1500);
+    expect(payload).not.toHaveProperty('response_format');
   });
 
   it('parsea el JSON del modelo limpio, envuelto en markdown o precedido de texto', () => {

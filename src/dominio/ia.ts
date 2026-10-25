@@ -4,7 +4,7 @@
 
 export const MAX_CARACTERES_IA = 3000;
 export const MAX_TOKENS_IA = 1500;
-export const MODELO_IA_POR_DEFECTO = 'anthropic/claude-3.5-sonnet';
+export const MODELO_IA_POR_DEFECTO = 'deepseek/deepseek-v4.1-flash-1017';
 
 export const SYSTEM_PROMPT_ABOGADO_DIABLO = `Eres un auditor lógico implacable, experto en Teoría de Juegos, Diseño de Incentivos, Sistemas Complejos y Sesgos Cognitivos.
 El usuario acaba de leer un ensayo exigente y ha redactado de memoria una síntesis quirúrgica en 3 partes:
@@ -86,16 +86,14 @@ export function construirMensajeUsuario(p: PeticionIa): string {
 
 /**
  * Construye el payload para OpenRouter.
- * No envía `response_format: { type: 'json_object' }` cuando el modelo es de Anthropic (`anthropic/...`),
- * ya que algunos endpoints de Claude en OpenRouter fallan o devuelven contenido vacío con ese flag.
+ * Omite `response_format: { type: 'json_object' }` para máxima compatibilidad con proveedores de DeepSeek y Anthropic
+ * en OpenRouter, forzando el JSON desde el prompt y extrayéndolo con `extraerSubcadenaJson`.
  */
 export function construirPayloadOpenRouter(model: string, peticion: PeticionIa): Record<string, unknown> {
-  const esAnthropic = model.trim().toLowerCase().startsWith('anthropic/');
   return {
     model,
     max_tokens: MAX_TOKENS_IA,
     temperature: 0.3,
-    ...(!esAnthropic ? { response_format: { type: 'json_object' } } : {}),
     messages: [
       { role: 'system', content: SYSTEM_PROMPT_ABOGADO_DIABLO },
       { role: 'user', content: construirMensajeUsuario(peticion) },

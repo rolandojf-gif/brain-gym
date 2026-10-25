@@ -32,7 +32,7 @@ const peticion = (cuerpo: unknown, token = TOKEN, method = 'POST') =>
 beforeEach(() => {
   process.env.BG_TOKEN = TOKEN;
   process.env.OPENROUTER_API_KEY = 'sk-or-test-key';
-  process.env.OPENROUTER_MODEL = 'anthropic/claude-3.5-sonnet';
+  process.env.OPENROUTER_MODEL = 'deepseek/deepseek-v4.1-flash-1017';
   vi.restoreAllMocks();
 });
 
@@ -81,7 +81,7 @@ describe('/api/ia', () => {
       response_format?: unknown;
       messages: { role: string; content: string }[];
     };
-    expect(enviado.model).toBe('anthropic/claude-3.5-sonnet');
+    expect(enviado.model).toBe('deepseek/deepseek-v4.1-flash-1017');
     expect(enviado.max_tokens).toBe(1500);
     expect(enviado.temperature).toBe(0.3);
     expect(enviado.response_format).toBeUndefined();

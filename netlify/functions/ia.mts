@@ -40,7 +40,11 @@ export default async (req: Request): Promise<Response> => {
   if (!apiKey) {
     return json({ error: 'Falta configurar OPENROUTER_API_KEY en el servidor de Netlify' }, 500);
   }
-  const model = leerEnv('OPENROUTER_MODEL') || MODELO_IA_POR_DEFECTO;
+  const envModel = leerEnv('OPENROUTER_MODEL');
+  const model =
+    !envModel || envModel === 'anthropic/claude-3.5-sonnet' || envModel === 'anthropic/claude-sonnet-5.5'
+      ? MODELO_IA_POR_DEFECTO
+      : envModel;
 
   let res: Response;
   try {
