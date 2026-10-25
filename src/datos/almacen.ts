@@ -1,11 +1,12 @@
 /* Almacén local en IndexedDB: una tienda por colección, más `meta` (versión de esquema, cursor de sincronización,
    copia previa) y `pendientes` (cambios locales aún no enviados). */
 import { openDB, type IDBPDatabase } from 'idb';
-import { ajustesPorDefecto, fuentesIniciales, lecturasIniciales } from '../dominio/ajustes';
+import { LECTURAS_SEMILLA, ajustesPorDefecto, fuentesIniciales, lecturasIniciales } from '../dominio/ajustes';
 import { ID_FUENTE_RETOS, fuenteRetos } from '../dominio/catalogo-retos';
 import { exportar, migrar, ErrorDeDatos } from '../dominio/migraciones';
+import { actualizar } from '../dominio/registro';
 import { fusionar, ganador, type Cambio } from '../dominio/sincronizacion';
-import { COLECCIONES, ESQUEMA_VERSION, coleccionesVacias, type Base, type Coleccion, type Colecciones, type Exportacion } from '../dominio/tipos';
+import { COLECCIONES, ESQUEMA_VERSION, coleccionesVacias, type Base, type Coleccion, type Colecciones, type Exportacion, type Lectura } from '../dominio/tipos';
 
 /* La versión de IndexedDB sólo cambia si cambia la lista de tiendas o índices; la forma de los datos la versiona
    ESQUEMA_VERSION con migraciones puras. */
@@ -55,6 +56,16 @@ export class Almacen {
     if ((await this.db.count('lecturas')) === 0) {
       const tx = this.db.transaction('lecturas', 'readwrite');
       for (const l of lecturasIniciales(ahora)) await tx.objectStore('lecturas').put(l);
+      await tx.done;
+    } else {
+      const tx = this.db.transaction('lecturas', 'readwrite');
+      const tienda = tx.objectStore('lecturas');
+      for (const s of LECTURAS_SEMILLA) {
+        const existente = (await tienda.get(s.id)) as Lectura | undefined;
+        if (existente && (existente.url !== s.url || existente.medio !== s.medio)) {
+          await tienda.put(actualizar(existente, { url: s.url, medio: s.medio }, ahora));
+        }
+      }
       await tx.done;
     }
   }

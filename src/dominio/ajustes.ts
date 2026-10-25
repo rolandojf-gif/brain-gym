@@ -44,9 +44,9 @@ export const LECTURAS_SEMILLA: readonly SemillaLectura[] = [
   {
     id: 'lectura-semilla-02',
     titulo: 'The Strategy of Conflict: Schelling Points & Credible Commitment',
-    medio: 'LessWrong / Harvard',
+    medio: 'Thomas Schelling / Wikipedia',
     tema: 'Compromiso Estratégico y Puntos Focales',
-    url: 'https://www.lesswrong.com/tag/schelling-point',
+    url: 'https://en.wikipedia.org/wiki/Focal_point_(game_theory)',
   },
   {
     id: 'lectura-semilla-03',
@@ -86,9 +86,9 @@ export const LECTURAS_SEMILLA: readonly SemillaLectura[] = [
   {
     id: 'lectura-semilla-08',
     titulo: "Braess's Paradox: How Adding Roads Slows Down Traffic",
-    medio: 'Quanta Magazine',
+    medio: 'Wikipedia / Redes',
     tema: 'Paradojas en Redes y Equilibrios Egoístas',
-    url: 'https://www.quantamagazine.org/braess-paradox-shows-how-extra-roads-slow-traffic-20220316/',
+    url: 'https://en.wikipedia.org/wiki/Braess%27s_paradox',
   },
   {
     id: 'lectura-semilla-09',

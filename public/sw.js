@@ -4,7 +4,7 @@
    - /assets/* (nombres con hash, inmutables): caché primero.
    - Resto del mismo origen: red primero con copia en caché.
    Las peticiones a otros orígenes (fuentes de Google) no se interceptan. */
-const CACHE = 'bg-v2';
+const CACHE = 'bg-v3';
 const BASE = ['/', '/index.html', '/theme-init.js', '/manifest.webmanifest', '/icons/icon-192.png'];
 
 self.addEventListener('install', (e) => {
