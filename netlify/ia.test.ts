@@ -32,7 +32,7 @@ const peticion = (cuerpo: unknown, token = TOKEN, method = 'POST') =>
 beforeEach(() => {
   process.env.BG_TOKEN = TOKEN;
   process.env.OPENROUTER_API_KEY = 'sk-or-test-key';
-  process.env.OPENROUTER_MODEL = 'google/gemini-2.5-flash';
+  process.env.OPENROUTER_MODEL = 'anthropic/claude-3.5-sonnet';
   vi.restoreAllMocks();
 });
 
@@ -50,11 +50,18 @@ describe('/api/ia', () => {
     expect(await r.json()).toMatchObject({ error: expect.stringMatching(/3000 caracteres/) });
   });
 
-  it('envía max_tokens: 600, temperature: 0.3 y el system prompt a OpenRouter y devuelve las 3 claves', async () => {
+  it('envía max_tokens: 1500, temperature: 0.3, sin response_format en Claude, y soporta bloques de contenido', async () => {
     const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
-          choices: [{ message: { content: JSON.stringify(respuestaModelo) } }],
+          choices: [
+            {
+              finish_reason: 'stop',
+              message: {
+                content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(respuestaModelo)}\n\`\`\`` }],
+              },
+            },
+          ],
         }),
         { status: 200 },
       ),
@@ -71,12 +78,33 @@ describe('/api/ia', () => {
       model: string;
       max_tokens: number;
       temperature: number;
+      response_format?: unknown;
       messages: { role: string; content: string }[];
     };
-    expect(enviado.model).toBe('google/gemini-2.5-flash');
-    expect(enviado.max_tokens).toBe(600);
+    expect(enviado.model).toBe('anthropic/claude-3.5-sonnet');
+    expect(enviado.max_tokens).toBe(1500);
     expect(enviado.temperature).toBe(0.3);
+    expect(enviado.response_format).toBeUndefined();
     expect(enviado.messages[0]).toEqual({ role: 'system', content: SYSTEM_PROMPT_ABOGADO_DIABLO });
+  });
+
+  it('incluye código HTTP, OPENROUTER_MODEL y mensaje real de OpenRouter cuando el proveedor devuelve error', async () => {
+    process.env.OPENROUTER_MODEL = 'anthropic/claude-sonnet-5.5';
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: { message: 'anthropic/claude-sonnet-5.5 is not a valid model ID', code: 400 },
+        }),
+        { status: 400 },
+      ),
+    );
+
+    const res = await handler(peticion(cuerpoValido));
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('HTTP 400');
+    expect(body.error).toContain('anthropic/claude-sonnet-5.5');
+    expect(body.error).toContain('is not a valid model ID');
   });
 });
 

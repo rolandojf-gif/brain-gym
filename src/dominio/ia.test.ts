@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   ErrorValidacionIa,
   MAX_CARACTERES_IA,
+  MAX_TOKENS_IA,
   SYSTEM_PROMPT_ABOGADO_DIABLO,
   construirMensajeUsuario,
+  construirPayloadOpenRouter,
+  extraerContenidoOpenRouter,
   parsearRespuestaIa,
   validarPeticionIa,
 } from './ia';
@@ -46,7 +49,19 @@ describe('ia (Abogado del Diablo)', () => {
     ).toThrow(/supera el límite de 3000 caracteres/);
   });
 
-  it('parsea el JSON del modelo tanto limpio como envuelto en bloques markdown', () => {
+  it('construye el payload con max_tokens: 1500 y omite response_format en modelos de Anthropic', () => {
+    const p = { titulo: 'T', resumen: 'R', objecion: 'O' };
+    const claude = construirPayloadOpenRouter('anthropic/claude-3.5-sonnet', p);
+    expect(claude.max_tokens).toBe(MAX_TOKENS_IA);
+    expect(claude.max_tokens).toBe(1500);
+    expect(claude).not.toHaveProperty('response_format');
+
+    const gemini = construirPayloadOpenRouter('google/gemini-2.5-flash', p);
+    expect(gemini.max_tokens).toBe(1500);
+    expect(gemini.response_format).toEqual({ type: 'json_object' });
+  });
+
+  it('parsea el JSON del modelo limpio, envuelto en markdown o precedido de texto', () => {
     const jsonValido = JSON.stringify({
       diagnostico: 'Capturas el equilibrio pero omites el coste de verificación.',
       contraataque: 'Un regulador local sufre arbitraje jurisdiccional inmediato.',
@@ -58,13 +73,54 @@ describe('ia (Abogado del Diablo)', () => {
       modeloMentalSugerido: 'Trampa multipolar: Sin coacción global verificable, el desertor marca el estándar.',
     });
 
-    const conFences = `\`\`\`json\n${jsonValido}\n\`\`\``;
-    expect(parsearRespuestaIa(conFences).modeloMentalSugerido).toContain('Trampa multipolar:');
+    const conFencesYTexto = `Aquí tienes la auditoría solicitada:\n\`\`\`json\n${jsonValido}\n\`\`\`\nFin del análisis.`;
+    expect(parsearRespuestaIa(conFencesYTexto)).toEqual({
+      diagnostico: 'Capturas el equilibrio pero omites el coste de verificación.',
+      contraataque: 'Un regulador local sufre arbitraje jurisdiccional inmediato.',
+      modeloMentalSugerido: 'Trampa multipolar: Sin coacción global verificable, el desertor marca el estándar.',
+    });
   });
 
-  it('rechaza respuestas vacías, no JSON o sin las 3 claves', () => {
+  it('extrae texto cuando content es un array de bloques o viene en reasoning', () => {
+    const jsonValido = JSON.stringify({
+      diagnostico: 'Diagnóstico en bloque.',
+      contraataque: 'Contraataque en bloque.',
+      modeloMentalSugerido: 'Regla en bloque: Acción.',
+    });
+    const desdeBloques = extraerContenidoOpenRouter({
+      choices: [
+        {
+          finish_reason: 'stop',
+          message: {
+            content: [{ type: 'text', text: `\`\`\`json\n${jsonValido}\n\`\`\`` }],
+          },
+        },
+      ],
+    });
+    expect(parsearRespuestaIa(desdeBloques.texto).diagnostico).toBe('Diagnóstico en bloque.');
+
+    const desdeReasoning = extraerContenidoOpenRouter({
+      choices: [
+        {
+          finish_reason: 'length',
+          message: {
+            content: null,
+            reasoning: jsonValido,
+          },
+        },
+      ],
+    });
+    expect(parsearRespuestaIa(desdeReasoning.texto).contraataque).toBe('Contraataque en bloque.');
+  });
+
+  it('aplica fallback inteligente a diagnostico cuando el modelo responde texto plano sin JSON y lanza error sólo si está vacío', () => {
     expect(() => parsearRespuestaIa('')).toThrow(ErrorValidacionIa);
-    expect(() => parsearRespuestaIa('no es json')).toThrow(/no es un JSON válido/);
-    expect(() => parsearRespuestaIa(JSON.stringify({ diagnostico: 'a', contraataque: 'b' }))).toThrow(/3 claves requeridas/);
+    expect(() => parsearRespuestaIa('   ')).toThrow(/vacía/);
+
+    const textoLibre = 'Tu síntesis confunde correlación con causalidad y olvida el incentivo de salida.';
+    const fb = parsearRespuestaIa(textoLibre);
+    expect(fb.diagnostico).toBe(textoLibre);
+    expect(fb.contraataque.length).toBeGreaterThan(10);
+    expect(fb.modeloMentalSugerido.length).toBeGreaterThan(10);
   });
 });

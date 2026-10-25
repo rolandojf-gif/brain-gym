@@ -1,7 +1,10 @@
 /* Dominio puro del «Sparring de IA / Abogado del Diablo» para auditar síntesis 3x1 de lectura.
-   Sin red ni DOM: valida el payload de entrada (máx. 3.000 caracteres), construye el prompt y parsea el JSON devuelto. */
+   Sin red ni DOM: valida el payload de entrada (máx. 3.000 caracteres), construye el cuerpo para OpenRouter,
+   extrae contenido de respuestas string o bloques y parsea el JSON con fallback inteligente. */
 
 export const MAX_CARACTERES_IA = 3000;
+export const MAX_TOKENS_IA = 1500;
+export const MODELO_IA_POR_DEFECTO = 'anthropic/claude-3.5-sonnet';
 
 export const SYSTEM_PROMPT_ABOGADO_DIABLO = `Eres un auditor lógico implacable, experto en Teoría de Juegos, Diseño de Incentivos, Sistemas Complejos y Sesgos Cognitivos.
 El usuario acaba de leer un ensayo exigente y ha redactado de memoria una síntesis quirúrgica en 3 partes:
@@ -13,6 +16,7 @@ REGLAS DE ESTILO (ESTRICTAS):
 - Cero adulación, cero saludos y cero frases vacías ("Buen resumen", "Interesante punto"). Entra directo al bisturí en la primera palabra.
 - Tono directo, técnico, analítico y ligeramente irónico si el argumento del usuario es ingenuo. Habla siempre en castellano.
 - NUNCA reescribas el resumen del usuario. Audita sus fisuras lógicas.
+- Responde ÚNICAMENTE con el objeto JSON crudo, sin bloques markdown (\`\`\`json) ni texto introductorio.
 
 Devuelve EXCLUSIVAMENTE un objeto JSON válido con estas 3 claves exactas:
 {
@@ -80,37 +84,137 @@ export function construirMensajeUsuario(p: PeticionIa): string {
   ].join('\n');
 }
 
-export function parsearRespuestaIa(contenido: unknown): RespuestaAbogadoDiablo {
-  if (typeof contenido !== 'string' || !contenido.trim()) {
-    throw new ErrorValidacionIa('La respuesta del modelo está vacía.');
-  }
-  const limpio = limpiarBloqueJson(contenido.trim());
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(limpio);
-  } catch {
-    throw new ErrorValidacionIa('La respuesta del modelo no es un JSON válido.');
-  }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new ErrorValidacionIa('El JSON devuelto no es un objeto.');
-  }
-  const r = parsed as Record<string, unknown>;
-  const diagnostico = typeof r.diagnostico === 'string' ? r.diagnostico.trim() : '';
-  const contraataque = typeof r.contraataque === 'string' ? r.contraataque.trim() : '';
-  const modeloMentalSugerido = typeof r.modeloMentalSugerido === 'string' ? r.modeloMentalSugerido.trim() : '';
-
-  if (!diagnostico || !contraataque || !modeloMentalSugerido) {
-    throw new ErrorValidacionIa('El JSON devuelto no contiene las 3 claves requeridas (diagnostico, contraataque, modeloMentalSugerido).');
-  }
-
-  return { diagnostico, contraataque, modeloMentalSugerido };
+/**
+ * Construye el payload para OpenRouter.
+ * No envía `response_format: { type: 'json_object' }` cuando el modelo es de Anthropic (`anthropic/...`),
+ * ya que algunos endpoints de Claude en OpenRouter fallan o devuelven contenido vacío con ese flag.
+ */
+export function construirPayloadOpenRouter(model: string, peticion: PeticionIa): Record<string, unknown> {
+  const esAnthropic = model.trim().toLowerCase().startsWith('anthropic/');
+  return {
+    model,
+    max_tokens: MAX_TOKENS_IA,
+    temperature: 0.3,
+    ...(!esAnthropic ? { response_format: { type: 'json_object' } } : {}),
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT_ABOGADO_DIABLO },
+      { role: 'user', content: construirMensajeUsuario(peticion) },
+    ],
+  };
 }
 
-function limpiarBloqueJson(texto: string): string {
-  const match = texto.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  if (match?.[1]) return match[1].trim();
-  const inicio = texto.indexOf('{');
-  const fin = texto.lastIndexOf('}');
-  if (inicio !== -1 && fin > inicio) return texto.slice(inicio, fin + 1);
-  return texto;
+/**
+ * Extrae el texto útil del objeto devuelto por OpenRouter:
+ * soporta `message.content` como string, como array de bloques `[{ type: 'text', text: '...' }]`,
+ * `choice.text` o fallback a `message.reasoning` / `message.reasoning_content` si el modelo agotó tokens pensando.
+ */
+export function extraerContenidoOpenRouter(cuerpo: unknown): { texto: string; finishReason?: string; errorDetalle?: string } {
+  if (typeof cuerpo !== 'object' || cuerpo === null) {
+    return { texto: '', errorDetalle: 'Respuesta de OpenRouter no es un objeto JSON.' };
+  }
+  const data = cuerpo as {
+    error?: { message?: unknown; code?: unknown };
+    choices?: {
+      finish_reason?: unknown;
+      text?: unknown;
+      message?: {
+        content?: unknown;
+        reasoning?: unknown;
+        reasoning_content?: unknown;
+      };
+    }[];
+  };
+
+  if (data.error) {
+    const msg = typeof data.error.message === 'string' ? data.error.message : JSON.stringify(data.error);
+    const code = data.error.code !== undefined ? ` (código ${String(data.error.code)})` : '';
+    return { texto: '', errorDetalle: `${msg}${code}` };
+  }
+
+  const choice = data.choices?.[0];
+  const finishReason = typeof choice?.finish_reason === 'string' ? choice.finish_reason : undefined;
+  if (!choice) {
+    return { texto: '', ...(finishReason ? { finishReason } : {}), errorDetalle: 'OpenRouter devolvió choices vacío.' };
+  }
+
+  const content = choice.message?.content;
+  const extraido = aTextoPlano(content)
+    || aTextoPlano(choice.text)
+    || aTextoPlano(choice.message?.reasoning)
+    || aTextoPlano(choice.message?.reasoning_content);
+
+  return {
+    texto: extraido.trim(),
+    ...(finishReason ? { finishReason } : {}),
+  };
+}
+
+function aTextoPlano(valor: unknown): string {
+  if (typeof valor === 'string') return valor.trim();
+  if (Array.isArray(valor)) {
+    return valor
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (typeof item === 'object' && item !== null && 'text' in item && typeof (item as { text?: unknown }).text === 'string') {
+          return (item as { text: string }).text;
+        }
+        return '';
+      })
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+  }
+  return '';
+}
+
+/**
+ * Extrae el JSON buscando el primer `{` y el último `}` (anti-markdown).
+ * Si el modelo responde con texto válido en español pero no en formato JSON exacto,
+ * hace un fallback inteligente asignando el texto recibido a `diagnostico`.
+ */
+export function parsearRespuestaIa(contenido: unknown): RespuestaAbogadoDiablo {
+  const texto = aTextoPlano(contenido);
+  if (!texto) {
+    throw new ErrorValidacionIa('La respuesta del modelo está vacía.');
+  }
+
+  const limpio = extraerSubcadenaJson(texto);
+  if (limpio) {
+    try {
+      const parsed: unknown = JSON.parse(limpio);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        const r = parsed as Record<string, unknown>;
+        const diagnostico = typeof r.diagnostico === 'string' ? r.diagnostico.trim() : '';
+        const contraataque = typeof r.contraataque === 'string' ? r.contraataque.trim() : '';
+        const modeloMentalSugerido = typeof r.modeloMentalSugerido === 'string' ? r.modeloMentalSugerido.trim() : '';
+        if (diagnostico || contraataque || modeloMentalSugerido) {
+          return {
+            diagnostico: diagnostico || 'Sin diagnóstico adicional.',
+            contraataque: contraataque || 'Sin contraataque adicional.',
+            modeloMentalSugerido: modeloMentalSugerido || 'Auditoría lógica: Revisa los supuestos implícitos de tu síntesis.',
+          };
+        }
+      }
+    } catch {
+      /* Si el bloque entre llaves no era JSON válido, cae al fallback de texto plano inferior */
+    }
+  }
+
+  // Fallback inteligente cuando el modelo responde en texto libre sin JSON válido
+  const textoSinFences = texto.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  return {
+    diagnostico: textoSinFences,
+    contraataque: 'El modelo devolvió su auditoría en formato de texto continuo (ver diagnóstico superior).',
+    modeloMentalSugerido: 'Auditoría directa: Contrasta las fisuras señaladas arriba con tu punto ciego original.',
+  };
+}
+
+export function extraerSubcadenaJson(texto: string): string | null {
+  const sinFences = texto.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  const primerCorchete = sinFences.indexOf('{');
+  const ultimoCorchete = sinFences.lastIndexOf('}');
+  if (primerCorchete !== -1 && ultimoCorchete > primerCorchete) {
+    return sinFences.slice(primerCorchete, ultimoCorchete + 1);
+  }
+  return null;
 }

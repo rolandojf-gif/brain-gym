@@ -1,18 +1,18 @@
 /* /api/ia: audita una síntesis 3x1 de lectura («Abogado del Diablo») llamando a OpenRouter.
-   Protegida con BG_TOKEN en tiempo constante (timingSafeEqual) y límite duro de entrada (3.000 caracteres) y salida (max_tokens: 600). */
+   Protegida con BG_TOKEN en tiempo constante (timingSafeEqual), límite de entrada (3.000 caracteres) y salida (max_tokens: 1500). */
 import type { Config } from '@netlify/functions';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import {
   MAX_CARACTERES_IA,
-  SYSTEM_PROMPT_ABOGADO_DIABLO,
-  construirMensajeUsuario,
+  MODELO_IA_POR_DEFECTO,
+  construirPayloadOpenRouter,
+  extraerContenidoOpenRouter,
   parsearRespuestaIa,
   validarPeticionIa,
   type PeticionIa,
 } from '../../src/dominio/ia';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODELO_POR_DEFECTO = 'google/gemini-2.5-flash';
 
 export default async (req: Request): Promise<Response> => {
   if (req.method !== 'POST') return json({ error: 'Método no permitido' }, 405);
@@ -40,7 +40,7 @@ export default async (req: Request): Promise<Response> => {
   if (!apiKey) {
     return json({ error: 'Falta configurar OPENROUTER_API_KEY en el servidor de Netlify' }, 500);
   }
-  const model = leerEnv('OPENROUTER_MODEL') || MODELO_POR_DEFECTO;
+  const model = leerEnv('OPENROUTER_MODEL') || MODELO_IA_POR_DEFECTO;
 
   let res: Response;
   try {
@@ -50,34 +50,55 @@ export default async (req: Request): Promise<Response> => {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: 600,
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT_ABOGADO_DIABLO },
-          { role: 'user', content: construirMensajeUsuario(peticion) },
-        ],
-      }),
+      body: JSON.stringify(construirPayloadOpenRouter(model, peticion)),
     });
-  } catch {
-    return json({ error: 'Error de red al conectar con OpenRouter' }, 502);
+  } catch (e) {
+    return json(
+      { error: `Error de red al conectar con OpenRouter (modelo: ${model}): ${e instanceof Error ? e.message : 'fallo de conexión'}` },
+      502,
+    );
+  }
+
+  const cuerpoTexto = await res.text().catch(() => '');
+  let cuerpoJson: unknown = null;
+  if (cuerpoTexto) {
+    try {
+      cuerpoJson = JSON.parse(cuerpoTexto);
+    } catch {
+      /* no era JSON */
+    }
   }
 
   if (!res.ok) {
-    return json({ error: `OpenRouter respondió con estado ${res.status}` }, 502);
+    const extraido = cuerpoJson ? extraerContenidoOpenRouter(cuerpoJson) : null;
+    const detalle = extraido?.errorDetalle || cuerpoTexto.slice(0, 240) || 'sin detalle adicional';
+    return json(
+      { error: `OpenRouter HTTP ${res.status} (modelo: ${model}): ${detalle}` },
+      502,
+    );
+  }
+
+  const { texto, finishReason, errorDetalle } = extraerContenidoOpenRouter(cuerpoJson);
+  if (errorDetalle) {
+    return json({ error: `OpenRouter error (modelo: ${model}): ${errorDetalle}` }, 502);
+  }
+  if (!texto) {
+    return json(
+      {
+        error: `La respuesta del modelo llegó vacía desde OpenRouter (HTTP ${res.status}, modelo: ${model}, finish_reason: ${finishReason ?? 'sin indicar'}). Revisa si el ID de OPENROUTER_MODEL es válido.`,
+      },
+      502,
+    );
   }
 
   try {
-    const cuerpo = (await res.json()) as {
-      choices?: { message?: { content?: unknown } }[];
-    };
-    const contenido = cuerpo.choices?.[0]?.message?.content;
-    const resultado = parsearRespuestaIa(contenido);
+    const resultado = parsearRespuestaIa(texto);
     return json(resultado, 200);
   } catch (e) {
-    return json({ error: e instanceof Error ? e.message : 'Respuesta inválida del modelo de IA' }, 502);
+    return json(
+      { error: `Error al procesar respuesta (modelo: ${model}): ${e instanceof Error ? e.message : 'formato inválido'}` },
+      502,
+    );
   }
 };
 
