@@ -89,11 +89,11 @@ describe('/api/ia', () => {
   });
 
   it('incluye código HTTP, OPENROUTER_MODEL y mensaje real de OpenRouter cuando el proveedor devuelve error', async () => {
-    process.env.OPENROUTER_MODEL = 'anthropic/claude-sonnet-5.5';
+    process.env.OPENROUTER_MODEL = 'anthropic/modelo-inexistente-test';
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
-          error: { message: 'anthropic/claude-sonnet-5.5 is not a valid model ID', code: 400 },
+          error: { message: 'anthropic/modelo-inexistente-test is not a valid model ID', code: 400 },
         }),
         { status: 400 },
       ),
@@ -103,7 +103,7 @@ describe('/api/ia', () => {
     expect(res.status).toBe(502);
     const body = (await res.json()) as { error: string };
     expect(body.error).toContain('HTTP 400');
-    expect(body.error).toContain('anthropic/claude-sonnet-5.5');
+    expect(body.error).toContain('anthropic/modelo-inexistente-test');
     expect(body.error).toContain('is not a valid model ID');
   });
 });
