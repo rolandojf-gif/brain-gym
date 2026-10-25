@@ -5,10 +5,13 @@ import {
   ID_FUENTE_RETOS,
   estadoDeReto,
   fuenteRetos,
+  inspeccionarRetoCompletado,
   siguienteRetoPendiente,
 } from './catalogo-retos';
 import { nuevo } from './registro';
-import type { EstadoIntento, Intento } from './tipos';
+import { coleccionesVacias, type EstadoIntento, type Intento } from './tipos';
+import { renderPanelRevision } from '../vistas/estudio';
+import type { Ctx } from '../app';
 
 const T0 = new Date('2026-10-26T09:00:00Z');
 const intento = (ejercicio: string, estado: EstadoIntento, min = 0): Intento =>
@@ -85,5 +88,35 @@ describe('catalogo-retos', () => {
       intento(r.id, r.id === '2.3' ? 'solucion' : 'sin_ayuda', idx),
     );
     expect(siguienteRetoPendiente(todos).id).toBe('2.3');
+  });
+
+  it('permite inspeccionar un reto completado (Modo Revisión) mostrando escenario, jugada, explicación, regla y acciones', () => {
+    const intentoKeynes: Intento = nuevo(
+      {
+        fuenteId: ID_FUENTE_RETOS,
+        capitulo: '1',
+        ejercicio: '1.2',
+        estado: 'solucion',
+        segundos: 95,
+        notaError: 'Jugada: C (correcta: D) · Lógica: Equilibrio de Nash en cero',
+        dia: '2026-10-26',
+      },
+      T0,
+    );
+    const insp = inspeccionarRetoCompletado('1.2', [intentoKeynes]);
+    if (!insp) throw new Error('Se esperaba inspección de reto 1.2');
+    expect(insp.opcionElegida).toBe('C');
+    expect(insp.acertada).toBe(false);
+    expect(insp.logica).toBe('Equilibrio de Nash en cero');
+    expect(insp.reto.opcionCorrecta).toBe('D');
+
+    const ctxFalso = { datos: coleccionesVacias() } as unknown as Ctx;
+    const html = renderPanelRevision(ctxFalso, insp);
+    expect(html).toContain(insp.reto.escenario);
+    expect(html).toContain('Marcaste la opción C (trampa); la jugada óptima era la D');
+    expect(html).toContain(insp.reto.solucion);
+    expect(html).toContain(insp.reto.modeloMental);
+    expect(html).toContain('[ + Crear tarjeta FSRS con esta regla ]');
+    expect(html).toContain('[ Reintentar reto ]');
   });
 });

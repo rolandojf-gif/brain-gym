@@ -272,6 +272,19 @@ table.cap td { padding: 6px 8px; }
 .bloque-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .bloque-head h3 { font: 700 18px/1.2 var(--f-head); margin: 2px 0 4px; }
 .bloque-cat .lista { margin-top: 4px; box-shadow: none; }
+.bloque-cat .lista > li { flex-direction: column; align-items: stretch; gap: 12px; }
+.li-fila { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; width: 100%; }
+.reto-completado { opacity: .82; transition: opacity .15s ease; }
+.reto-completado:hover, .reto-completado.abierto { opacity: 1; background: var(--card); }
+.reto-completado .li-main[role="button"] { cursor: pointer; }
+.reto-revision-cuerpo {
+  width: 100%; padding-top: 14px; border-top: 2px dashed var(--ink);
+  display: flex; flex-direction: column; gap: 12px; opacity: 1;
+}
+.rev-opcion { cursor: default; }
+.rev-opcion:hover { background: var(--card); }
+.rev-opcion.op-correcta:hover { background: rgba(14, 159, 110, .12); }
+.rev-opcion.op-trampa:hover { background: rgba(200, 30, 58, .10); }
 .flash-inline { margin-top: 12px; padding-top: 12px; border-top: 2px dashed var(--line); display: flex; flex-direction: column; gap: 8px; }
 .flash-q { font: 600 15.5px/1.45 var(--f-body); margin: 0; }
 .flash-a { font: 400 15px/1.45 var(--f-body); margin: 0; padding: 8px 10px; background: var(--card-2); border-left: 4px solid var(--ok); }

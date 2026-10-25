@@ -678,6 +678,40 @@ export function estadoDeReto(retoId: string, intentos: readonly Intento[]): Esta
   return ultimos.find((i) => i.ejercicio === retoId)?.estado ?? null;
 }
 
+export interface InspeccionReto {
+  reto: Reto;
+  intento: Intento;
+  opcionElegida: string | null;
+  logica: string;
+  acertada: boolean;
+}
+
+/**
+ * Reconstruye el detalle completo de un reto ya respondido (escenario, opción elegida por el usuario,
+ * opción óptima, si acertó o cayó en la trampa, explicación y regla mental) para el Modo Revisión.
+ */
+export function inspeccionarRetoCompletado(retoId: string, intentos: readonly Intento[]): InspeccionReto | null {
+  const reto = CATALOGO_RETOS.find((r) => r.id === retoId);
+  if (!reto) return null;
+  const ultimos = ultimosIntentos(intentos.filter((i) => i.fuenteId === ID_FUENTE_RETOS));
+  const intento = ultimos.find((i) => i.ejercicio === retoId);
+  if (!intento) return null;
+
+  const matchJugada = intento.notaError.match(/Jugada:\s*([A-D])/i);
+  const opcionElegida = matchJugada?.[1]?.toUpperCase() ?? (intento.estado === 'sin_ayuda' ? reto.opcionCorrecta : null);
+  const matchLogica = intento.notaError.match(/Lógica:\s*(.+)$/i);
+  const logica = matchLogica?.[1]?.trim() ?? '';
+  const acertada = opcionElegida === reto.opcionCorrecta;
+
+  return {
+    reto,
+    intento,
+    opcionElegida,
+    logica,
+    acertada,
+  };
+}
+
 /**
  * Devuelve el siguiente reto pendiente del catálogo (opcionalmente filtrado por bloque):
  * 1. Primero busca el primer reto que nunca se haya intentado.
