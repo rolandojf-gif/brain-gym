@@ -2,7 +2,8 @@
    menú, no una agenda); `ajustes.planSemanal` se conserva en los datos por compatibilidad. */
 import { accion, campos, type Ctx, type Vista } from '../app';
 import { ID_FUENTE_RETOS } from '../dominio/catalogo-retos';
-import { MAX_LLAMADAS_IA_DIA } from '../dominio/retos-ia';
+import { MAX_LLAMADAS_RETOS_DIA, RESERVA_ABOGADO } from '../dominio/retos-ia';
+import { MAX_PETICIONES_DIA } from '../datos/retos-ia';
 import { actualizar } from '../dominio/registro';
 import { esc } from '../lib/html';
 import { cabecera, descargar } from './comun';
@@ -18,7 +19,7 @@ function panelRetosIa(ctx: Ctx): string {
     <div class="panel">
       <p>${listos} sin jugar · ${vivos.length} generados en total${reportados ? ` · ${reportados} marcados como erróneos` : ''}.</p>
       ${ctx.retosIa ? `<p class="estado-sync">${esc(ctx.retosIa)}</p>` : ''}
-      <p class="note">La app los pide sola, uno por tema, cuando tiene la clave de sincronización. Tope: ${MAX_LLAMADAS_IA_DIA} llamadas a la IA al día entre retos y Abogado del Diablo.</p>
+      <p class="note">La app los pide sola, uno por tema, cuando tiene la clave de sincronización. Topes diarios: ${MAX_PETICIONES_DIA} peticiones por dispositivo y ${MAX_LLAMADAS_RETOS_DIA} llamadas a la IA entre los dos; otras ${RESERVA_ABOGADO} quedan siempre para el Abogado del Diablo.</p>
     </div>`;
 }
 

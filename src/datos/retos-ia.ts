@@ -1,11 +1,11 @@
 /* Retos generados en segundo plano: pide a /api/retos uno por tema hasta tener uno listo en cada uno. Nunca bloquea
-   ni repinta: lo nuevo aparece en el siguiente pintado. Va de uno en uno y con topes por sesión, porque cada petición
-   gasta una o dos llamadas del cupo diario de IA. */
+   ni repinta: lo nuevo aparece en el siguiente pintado. Va de uno en uno y con topes diarios por dispositivo,
+   guardados en local, porque cada petición gasta una o dos llamadas del cupo diario de IA y la app se reabre a menudo. */
 import { BLOQUES_RETOS, temasPorReponer, todosLosRetos, vistosDeTema } from '../dominio/catalogo-retos';
 import { nuevo } from '../dominio/registro';
 import { validarRetoPropuesto } from '../dominio/retos-ia';
 import type { Colecciones, RetoGenerado, TemaReto } from '../dominio/tipos';
-import type { Almacen } from './almacen';
+import type { Almacen, GastoRetos } from './almacen';
 
 export type ResultadoReto =
   | { tipo: 'ok'; reto: RetoGenerado }
@@ -60,10 +60,17 @@ export async function pedirReto(
   }
 }
 
-/** Peticiones por sesión de la app (cada una gasta 1 o 2 llamadas de las 40 diarias). */
-export const MAX_PETICIONES_SESION = 10;
-/** Descartes seguidos de un tema antes de dejarlo para la próxima sesión. */
+/** Peticiones al día por dispositivo que llegan al modelo (cada una gasta 1 o 2 llamadas del cupo diario). */
+export const MAX_PETICIONES_DIA = 10;
+/** Descartes seguidos de un tema antes de pasar al siguiente (en esta sesión). */
 export const MAX_DESCARTES_TEMA = 2;
+/** Descartes seguidos, de cualquier tema, que delatan un fallo sistemático: se deja para mañana. */
+export const MAX_DESCARTES_SEGUIDOS = 3;
+
+export interface MemoriaGasto {
+  leer(): Promise<GastoRetos | undefined>;
+  guardar(gasto: GastoRetos): Promise<void>;
+}
 
 export interface DepsReponedor {
   almacen: Almacen;
@@ -72,6 +79,8 @@ export interface DepsReponedor {
   guardar: (reto: RetoGenerado) => Promise<void>;
   pedir?: typeof pedirReto;
   reloj?: () => number;
+  /** Dónde se guarda lo pedido hoy; por defecto, en `meta` del almacén. */
+  gasto?: MemoriaGasto;
   /** Se llama cada vez que cambia `estado`, para que la pestaña Datos lo muestre en vivo. */
   alCambiarEstado?: () => void;
 }
@@ -80,11 +89,16 @@ export class Reponedor {
   /** Última novedad, en una línea, para la pestaña Datos. */
   private estadoActual = '';
   private enCurso: Promise<void> | null = null;
-  private peticiones = 0;
   private descartes = new Map<TemaReto, number>();
   private pausaHasta = 0;
+  private readonly memoria: MemoriaGasto;
 
-  constructor(private readonly deps: DepsReponedor) {}
+  constructor(private readonly deps: DepsReponedor) {
+    this.memoria = deps.gasto ?? {
+      leer: () => deps.almacen.meta('gastoRetos'),
+      guardar: (g) => deps.almacen.ponerMeta('gastoRetos', g),
+    };
+  }
 
   get estado(): string {
     return this.estadoActual;
@@ -104,9 +118,8 @@ export class Reponedor {
     return this.enCurso;
   }
 
-  /** Tras cambiar la clave de sincronización: vuelve a intentarlo aunque antes fallara. */
+  /** Tras cambiar la clave de sincronización: vuelve a intentarlo aunque antes fallara. Los topes diarios siguen. */
   reiniciar(): void {
-    this.peticiones = 0;
     this.descartes.clear();
     this.pausaHasta = 0;
   }
@@ -114,36 +127,54 @@ export class Reponedor {
   private async bucle(): Promise<void> {
     const reloj = this.deps.reloj ?? Date.now;
     const pedir = this.deps.pedir ?? pedirReto;
-    while (reloj() >= this.pausaHasta && this.peticiones < MAX_PETICIONES_SESION) {
+    const hoy = diaUtc(reloj());
+    const guardado = await this.memoria.leer();
+    let gasto: GastoRetos = guardado?.dia === hoy ? guardado : { dia: hoy, peticiones: 0, descartesSeguidos: 0, ultimo: '' };
+
+    while (reloj() >= this.pausaHasta) {
+      if (gasto.descartesSeguidos >= MAX_DESCARTES_SEGUIDOS) {
+        this.estado = `${gasto.ultimo} Tras ${MAX_DESCARTES_SEGUIDOS} descartes seguidos, este dispositivo no pide más hasta mañana.`;
+        return;
+      }
+      if (gasto.peticiones >= MAX_PETICIONES_DIA) {
+        this.estado = `${gasto.ultimo} Este dispositivo ya ha pedido hoy ${MAX_PETICIONES_DIA} retos; mañana pedirá más.`;
+        return;
+      }
       const datos = this.deps.leer();
       const retos = todosLosRetos(datos.retos);
       const tema = temasPorReponer(retos, datos.intentos).find((t) => (this.descartes.get(t) ?? 0) < MAX_DESCARTES_TEMA);
-      if (!tema) return;
+      if (!tema) {
+        if (gasto.ultimo) this.estado = gasto.ultimo;
+        return;
+      }
       // Cada petición tarda decenas de segundos (generar, comprobar la fuente, revisar): que se vea que trabaja.
       this.estado = `Pidiendo un reto de ${BLOQUES_RETOS.find((b) => b.id === tema)?.titulo ?? `tema ${tema}`}…`;
       const r = await pedir(this.deps.almacen, tema, vistosDeTema(tema, retos));
-      if (r.tipo === 'parar' && r.motivo === 'sin-token') {
+      if (r.tipo === 'parar') {
+        // Ninguna de estas paradas llega al modelo, así que no cuenta para los topes del día.
         this.estado = r.mensaje;
+        // Sin clave o sin red se reintenta en la próxima ocasión (al sincronizar); con el cupo agotado, mañana (UTC);
+        // con la clave mal o el servidor roto, no hasta reiniciar la app o cambiar la clave.
+        if (r.motivo === 'cupo') this.pausaHasta = siguienteDiaUtc(reloj());
+        else if (r.motivo === 'token' || r.motivo === 'servidor') this.pausaHasta = Number.POSITIVE_INFINITY;
         return;
       }
-      this.peticiones++;
       if (r.tipo === 'ok') {
         await this.deps.guardar(r.reto);
         this.descartes.delete(tema);
-        this.estado = `Último reto generado: «${r.reto.titulo}».`;
-      } else if (r.tipo === 'descartado') {
-        this.descartes.set(tema, (this.descartes.get(tema) ?? 0) + 1);
-        this.estado = r.mensaje;
+        gasto = { ...gasto, peticiones: gasto.peticiones + 1, descartesSeguidos: 0, ultimo: `Último reto generado: «${r.reto.titulo}».` };
       } else {
-        this.estado = r.mensaje;
-        // Sin red se reintenta en la próxima ocasión (al volver a la app); con el cupo agotado, mañana (UTC);
-        // con la clave mal o el servidor roto, no hasta reiniciar la app o cambiar la clave.
-        if (r.motivo === 'cupo') this.pausaHasta = siguienteDiaUtc(reloj());
-        else if (r.motivo !== 'red') this.pausaHasta = Number.POSITIVE_INFINITY;
-        return;
+        this.descartes.set(tema, (this.descartes.get(tema) ?? 0) + 1);
+        gasto = { ...gasto, peticiones: gasto.peticiones + 1, descartesSeguidos: gasto.descartesSeguidos + 1, ultimo: r.mensaje };
       }
+      await this.memoria.guardar(gasto);
+      this.estado = gasto.ultimo;
     }
   }
+}
+
+function diaUtc(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
 }
 
 function siguienteDiaUtc(ms: number): number {

@@ -14,7 +14,20 @@ const VERSION_IDB = 2;
 const META = 'meta';
 const PENDIENTES = 'pendientes';
 
-type Meta = { esquema: number; cursor: number; copia: Exportacion; token: string };
+/**
+ * Lo que este dispositivo ha pedido hoy a /api/retos (día UTC, como el cupo del servidor). Es estado local: no se
+ * exporta ni se sincroniza, y sólo existe para que reabrir la app no reinicie los topes del reponedor.
+ */
+export interface GastoRetos {
+  dia: string;
+  /** Peticiones que llegaron al modelo (generadas o descartadas). */
+  peticiones: number;
+  descartesSeguidos: number;
+  /** Último resultado, para enseñarlo en Datos aunque la app se haya reabierto. */
+  ultimo: string;
+}
+
+type Meta = { esquema: number; cursor: number; copia: Exportacion; token: string; gastoRetos: GastoRetos };
 
 export class Almacen {
   private constructor(private readonly db: IDBPDatabase) {}

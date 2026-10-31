@@ -9,6 +9,9 @@ export const MAX_TOKENS_GENERAR = 4000;
 export const MAX_TOKENS_REVISAR = 1200;
 /** Tope de llamadas a la IA por día (UTC) entre todas las funciones: limita el gasto si algo entra en bucle. */
 export const MAX_LLAMADAS_IA_DIA = 40;
+/** Llamadas del cupo diario que los retos no pueden usar: quedan siempre para el Abogado del Diablo. */
+export const RESERVA_ABOGADO = 10;
+export const MAX_LLAMADAS_RETOS_DIA = MAX_LLAMADAS_IA_DIA - RESERVA_ABOGADO;
 /** Con cuatro opciones, la correcta no puede ser mucho más larga que la distractora más larga: delataría la respuesta. */
 export const RATIO_MAX_LONGITUD = 1.3;
 
@@ -301,8 +304,11 @@ export interface Cupo {
   usadas: number;
 }
 
-/** Reserva `n` llamadas del día `dia` (AAAA-MM-DD, UTC). Devuelve el cupo nuevo o null si no caben. */
+/**
+ * Reserva `n` llamadas del día `dia` (AAAA-MM-DD, UTC); con `n` negativo las devuelve (nunca por debajo de 0).
+ * Devuelve el cupo nuevo o null si no caben.
+ */
 export function reservarCupo(actual: Cupo | null, dia: string, n = 1, max = MAX_LLAMADAS_IA_DIA): Cupo | null {
   const usadas = actual && actual.dia === dia ? actual.usadas : 0;
-  return usadas + n > max ? null : { dia, usadas: usadas + n };
+  return n > 0 && usadas + n > max ? null : { dia, usadas: Math.max(0, usadas + n) };
 }
