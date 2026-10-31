@@ -101,7 +101,7 @@ Las dos funciones comparten `netlify/servidor.ts` (token, variables de entorno, 
 
 - **`/api/ia`:** el Abogado del Diablo de las lecturas. Una llamada por petición.
 - **`/api/retos`:** genera un reto sobre un tema (`{ tema, vistos }`). Un solo intento por petición, porque una función síncrona de Netlify tiene 60 s:
-  1. **Generar** con `OPENROUTER_MODEL` (temperatura 0,8). El prompt pide cuatro opciones de longitud parecida, un «por qué» en cada una, una sola defendible (o `null` en un debate) y una fuente real con URL pública.
+  1. **Generar** con `OPENROUTER_MODEL` (opcional; por defecto `MODELO_IA_POR_DEFECTO`, hoy `deepseek/deepseek-v4.1-flash-1017`), temperatura 0,8. El prompt pide cuatro opciones de longitud parecida, un «por qué» en cada una, una sola defendible (o `null` en un debate) y una fuente real con URL pública.
   2. **Validar** la forma (`validarRetoPropuesto`): letras A–D, sin opciones repetidas, la correcta no más de 1,3 veces más larga que el distractor más largo (para que no se delate) y URL `https` de un dominio con nombre.
   3. **Comprobar la fuente:** una petición GET de 6 s. Vale si responde por debajo de 400 o con 401/403/429 (existe, pero bloquea a robots); sólo se mira el código, no el contenido.
   4. **Revisar** con `OPENROUTER_MODEL_REVISOR` (por defecto, el mismo modelo; uno de otra familia detecta mejor los errores), temperatura 0. Si hay más de una opción defendible o la fuente no respalda la solución, se descarta.
