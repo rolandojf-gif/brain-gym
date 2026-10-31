@@ -6,9 +6,13 @@ import {
   BLOQUES_RETOS,
   CATALOGO_RETOS,
   ID_FUENTE_RETOS,
+  estadoAutomatico,
   estadoDeReto,
   fuenteRetos,
   inspeccionarRetoCompletado,
+  intentosContables,
+  letraVisible,
+  opcionesVisibles,
   siguienteRetoPendiente,
   type InspeccionReto,
   type Reto,
@@ -24,6 +28,8 @@ import { cabecera, vacio } from './comun';
 interface EstadoAcordeon {
   retoId: string;
   paso: 1 | 2 | 3;
+  /** Jugada fijada antes de la pista: decide si cuenta como «sin ayuda». */
+  opcionInicial: string;
   opcionElegida: string;
   logica: string;
   pistaDesbloqueada: boolean;
@@ -39,6 +45,7 @@ function asegurarEstado(reto: Reto): EstadoAcordeon {
     estadoActual = {
       retoId: reto.id,
       paso: 1,
+      opcionInicial: '',
       opcionElegida: '',
       logica: '',
       pistaDesbloqueada: false,
@@ -69,19 +76,19 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
     ? `<span class="tag e-${estadoPrevio}">${esc(ETIQUETA_ESTADO[estadoPrevio])}</span>`
     : '<span class="tag">Pendiente</span>';
 
-  const bloqueOpciones = reto.opciones
+  const bloqueOpciones = opcionesVisibles(reto)
     .map((op) => {
       const checked = est.opcionElegida === op.id ? ' checked' : '';
       const disabled = est.paso === 3 || (est.paso === 2 && !est.pistaDesbloqueada) ? ' disabled' : '';
       let claseExtra = '';
-      if (est.paso === 3) {
+      if (est.paso === 3 && !reto.debate) {
         if (op.id === reto.opcionCorrecta) claseExtra = ' op-correcta';
         else if (op.id === est.opcionElegida) claseExtra = ' op-trampa';
       }
       return `
         <label class="reto-opcion${claseExtra}">
           <input type="radio" name="opcion" value="${esc(op.id)}"${checked}${disabled} required>
-          <span class="op-letra">${esc(op.id)}</span>
+          <span class="op-letra">${esc(op.letra)}</span>
           <span class="op-texto">${esc(op.texto)}</span>
         </label>`;
     })
@@ -98,7 +105,7 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
     est.paso >= 2
       ? `<div class="reto-paso">
            <div class="lbl">Paso 2 · Andamiaje opcional</div>
-           <p class="m-sub">Jugada fijada: <b>Opción ${esc(est.opcionElegida)}</b>${est.logica ? ` · «${esc(est.logica)}»` : ''}</p>
+           <p class="m-sub">Jugada fijada: <b>Opción ${esc(letraVisible(reto, est.opcionInicial))}</b>${est.logica ? ` · «${esc(est.logica)}»` : ''}</p>
            ${
              est.pistaDesbloqueada
                ? `<div class="reto-pista"><b>Pista desbloqueada:</b> ${esc(reto.pista)}<p class="m-sub">Si has detectado el fallo, puedes cambiar la opción marcada arriba antes de ver la resolución.</p></div>`
@@ -115,14 +122,18 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
          </div>`
       : '';
 
-  const acertada = est.opcionElegida === reto.opcionCorrecta;
+  const estadoFinal = estadoAutomatico(reto, est.opcionInicial, est.opcionElegida, est.pistaDesbloqueada);
+  const elegida = esc(letraVisible(reto, est.opcionElegida));
+  const veredicto = reto.debate
+    ? `<div class="reto-veredicto"><b>Reto de debate: elegiste la ${elegida}. No hay respuesta correcta; mira los argumentos de cada lado.</b></div>`
+    : est.opcionElegida === reto.opcionCorrecta
+      ? `<div class="reto-veredicto ok"><b>${estadoFinal === 'sin_ayuda' ? '¡Diste en el clavo!' : `Acertaste con la pista (elegiste la ${elegida}).`}</b></div>`
+      : `<div class="reto-veredicto trampa"><b>Caíste en la trampa intuitiva (elegiste la ${elegida}, la mejor jugada es la ${esc(letraVisible(reto, reto.opcionCorrecta))})</b></div>`;
   const paso3 =
     est.paso === 3
       ? `<div class="reto-paso reto-resolucion">
            <div class="lbl">Paso 3 · Choque con la realidad</div>
-           <div class="reto-veredicto ${acertada ? 'ok' : 'trampa'}">
-             <b>${acertada ? '¡Diste en el clavo!' : `Caíste en la trampa intuitiva (elegiste ${esc(est.opcionElegida)}, la mejor jugada es ${esc(reto.opcionCorrecta)})`}</b>
-           </div>
+           ${veredicto}
            <div class="reto-explicacion">
              <p>${esc(reto.solucion)}</p>
            </div>
@@ -131,9 +142,8 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
              <p><b>${esc(reto.modeloMental)}</b></p>
            </div>
            <div class="acciones reto-cierre">
-             <button type="button" class="btn ${acertada && !est.pistaDesbloqueada ? 'primario' : ''}" data-accion="guardar-reto" data-estado="sin_ayuda">[ Lo clavé sin ayuda ]</button>
-             <button type="button" class="btn ${est.pistaDesbloqueada && acertada ? 'primario' : ''}" data-accion="guardar-reto" data-estado="con_pista">[ Necesité la pista ]</button>
-             <button type="button" class="btn ${!acertada ? 'primario' : ''}" data-accion="guardar-reto" data-estado="solucion">[ Caí en la trampa · Crear tarjeta de repaso ]</button>
+             <button type="button" class="btn primario" data-accion="guardar-reto">${estadoFinal === 'solucion' ? '[ Guardar y crear tarjeta de repaso ]' : '[ Guardar y seguir ]'}</button>
+             <span class="m-sub">${reto.debate ? 'Debate: no cuenta en las estadísticas.' : `Se guarda como: ${esc(ETIQUETA_ESTADO[estadoFinal])}.`}</span>
            </div>
          </div>`
       : '';
@@ -172,13 +182,15 @@ export function renderPanelRevision(ctx: Ctx, insp: InspeccionReto): string {
         t.anverso.includes(`[Reto ${reto.id}`)),
   );
 
-  const opcionesHtml = reto.opciones
+  const opcionesHtml = opcionesVisibles(reto)
     .map((op) => {
       const esCorrecta = op.id === reto.opcionCorrecta;
       const esElegida = op.id === opcionElegida;
       const clase = esCorrecta ? ' op-correcta' : esElegida ? ' op-trampa' : '';
       let insignia = '';
-      if (esCorrecta && esElegida) {
+      if (reto.debate) {
+        insignia = esElegida ? '<span class="tag">Tu postura</span>' : '';
+      } else if (esCorrecta && esElegida) {
         insignia = '<span class="tag e-sin_ayuda">✓ Tu jugada · Óptima</span>';
       } else if (esCorrecta) {
         insignia = '<span class="tag e-sin_ayuda">✓ Opción óptima</span>';
@@ -187,7 +199,7 @@ export function renderPanelRevision(ctx: Ctx, insp: InspeccionReto): string {
       }
       return `
         <div class="reto-opcion rev-opcion${clase}">
-          <span class="op-letra">${esc(op.id)}</span>
+          <span class="op-letra">${esc(op.letra)}</span>
           <span class="op-texto">${esc(op.texto)} ${insignia}</span>
         </div>`;
     })
@@ -198,13 +210,15 @@ export function renderPanelRevision(ctx: Ctx, insp: InspeccionReto): string {
       <p class="reto-escenario">${esc(reto.escenario)}</p>
       <div class="lbl">Opciones y diagnóstico de tu jugada</div>
       <div class="reto-opciones">${opcionesHtml}</div>
-      <div class="reto-veredicto ${acertada ? 'ok' : 'trampa'}">
+      <div class="reto-veredicto ${reto.debate ? '' : acertada ? 'ok' : 'trampa'}">
         <b>${
-          acertada
-            ? `Acertaste la opción óptima (${esc(reto.opcionCorrecta)})`
-            : opcionElegida
-              ? `Marcaste la opción ${esc(opcionElegida)} (trampa); la jugada óptima era la ${esc(reto.opcionCorrecta)}`
-              : `La jugada óptima era la opción ${esc(reto.opcionCorrecta)}`
+          reto.debate
+            ? `Reto de debate: tu postura fue la ${esc(letraVisible(reto, opcionElegida) ?? '—')}`
+            : acertada
+              ? `Acertaste la opción óptima (${esc(letraVisible(reto, reto.opcionCorrecta))})`
+              : opcionElegida
+                ? `Marcaste la opción ${esc(letraVisible(reto, opcionElegida))} (trampa); la jugada óptima era la ${esc(letraVisible(reto, reto.opcionCorrecta))}`
+                : `La jugada óptima era la opción ${esc(letraVisible(reto, reto.opcionCorrecta))}`
         }</b>
         ${logica ? `<span> · Tu lógica: «${esc(logica)}»</span>` : ''}
       </div>
@@ -226,6 +240,12 @@ export function renderPanelRevision(ctx: Ctx, insp: InspeccionReto): string {
         <button type="button" class="btn sutil" data-accion="toggle-revision" data-id="${esc(reto.id)}">Cerrar análisis</button>
       </div>
     </div>`;
+}
+
+function resumenInspeccion({ reto, opcionElegida, acertada }: InspeccionReto): string {
+  const elegida = esc(letraVisible(reto, opcionElegida) ?? '—');
+  if (reto.debate) return `Debate (tu postura: ${elegida})`;
+  return acertada ? `Resuelto (opción ${elegida})` : `Trampa detectada (elegiste ${elegida}, óptima ${esc(letraVisible(reto, reto.opcionCorrecta))})`;
 }
 
 function filaIntento(ctx: Ctx, i: Intento): string {
@@ -253,8 +273,9 @@ export const estudio: Vista = {
   render(ctx) {
     const fuente = fuenteRetos(ctx.ahora);
     const intentos = ctx.datos.intentos.filter((i) => !i.borrado).sort((a, b) => b.creado.localeCompare(a.creado));
-    const desglose = desgloseResolucion(intentos);
-    const progreso = progresoPorCapitulo(fuente, intentos);
+    const contables = intentosContables(intentos);
+    const desglose = desgloseResolucion(contables);
+    const progreso = progresoPorCapitulo(fuente, contables);
     const reto = retoActivo(ctx);
     const est = asegurarEstado(reto);
     const estadoPrevio = estadoDeReto(reto.id, intentos);
@@ -290,7 +311,7 @@ export const estudio: Vista = {
                     <div class="li-fila">
                       <div class="li-main" ${insp ? `data-accion="toggle-revision" data-id="${esc(r.id)}" role="button" tabindex="0"` : ''}>
                         <b>${esc(r.id)} · ${esc(r.titulo)} ${st ? `<span class="tag e-${st}">${esc(ETIQUETA_ESTADO[st])}</span>` : '<span class="tag">Pendiente</span>'}</b>
-                        ${insp ? `<span class="m-sub">${insp.acertada ? `Resuelto (opción ${esc(insp.opcionElegida ?? r.opcionCorrecta)})` : `Trampa detectada (elegiste ${esc(insp.opcionElegida ?? '—')}, óptima ${esc(r.opcionCorrecta)})`} · Clic para ${abierto ? 'ocultar' : 'inspeccionar análisis y regla'}</span>` : ''}
+                        ${insp ? `<span class="m-sub">${resumenInspeccion(insp)} · Clic para ${abierto ? 'ocultar' : 'inspeccionar análisis y regla'}</span>` : ''}
                       </div>
                       <div class="li-acc">
                         ${
@@ -335,6 +356,7 @@ export const estudio: Vista = {
       estadoActual = {
         retoId: sig.id,
         paso: 1,
+        opcionInicial: '',
         opcionElegida: '',
         logica: '',
         pistaDesbloqueada: false,
@@ -351,6 +373,7 @@ export const estudio: Vista = {
       estadoActual = {
         retoId: buscado.id,
         paso: 1,
+        opcionInicial: '',
         opcionElegida: '',
         logica: '',
         pistaDesbloqueada: false,
@@ -391,25 +414,21 @@ export const estudio: Vista = {
       ctx.avisar('Tarjeta FSRS creada con la regla mental de este reto.');
     });
 
-    accion(raiz, 'click', 'reintentar-reto', async (b) => {
+    accion(raiz, 'click', 'reintentar-reto', (b) => {
       const id = b.dataset.id ?? '';
       const reto = CATALOGO_RETOS.find((r) => r.id === id);
       if (!reto) return;
-      const ahora = new Date();
-      const previos = ctx.datos.intentos.filter((i) => !i.borrado && i.fuenteId === ID_FUENTE_RETOS && i.ejercicio === id);
       revisionesAbiertas.delete(id);
       estadoActual = {
         retoId: reto.id,
         paso: 1,
+        opcionInicial: '',
         opcionElegida: '',
         logica: '',
         pistaDesbloqueada: false,
         inicioMs: Date.now(),
       };
-      if (previos.length > 0) {
-        await ctx.guardar(...previos.map((p) => ({ coleccion: 'intentos' as const, registro: borrar(p, ahora) })));
-      }
-      ctx.avisar(`Reto ${reto.id} reiniciado y listo en el ring superior.`);
+      ctx.avisar(`Reto ${reto.id} listo en el ring superior. Tus intentos anteriores se conservan.`);
       if (ctx.sub) ctx.ir('#estudio');
       else ctx.pintar();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -427,6 +446,7 @@ export const estudio: Vista = {
       const est = asegurarEstado(reto);
       const v = campos(form as HTMLFormElement);
       if (!v.opcion) return ctx.avisar('Selecciona una opción antes de fijar tu jugada.', 'error');
+      est.opcionInicial = v.opcion;
       est.opcionElegida = v.opcion;
       est.logica = v.logica ?? '';
       est.paso = 2;
@@ -449,14 +469,16 @@ export const estudio: Vista = {
       ctx.pintar();
     });
 
-    accion(raiz, 'click', 'guardar-reto', async (b) => {
+    accion(raiz, 'click', 'guardar-reto', async () => {
       const reto = retoActivo(ctx);
       const est = asegurarEstado(reto);
-      const estado = (b.dataset.estado ?? 'sin_ayuda') as EstadoIntento;
+      const estado = estadoAutomatico(reto, est.opcionInicial, est.opcionElegida, est.pistaDesbloqueada);
       const ahora = new Date();
       const segundos = Math.max(5, Math.round((Date.now() - est.inicioMs) / 1000));
+      // Se guardan las letras internas (estables), no las visibles. «Lógica» va al final porque se lee hasta el fin.
       const resumenJugada = [
-        `Jugada: ${est.opcionElegida || '—'} (correcta: ${reto.opcionCorrecta})`,
+        `Jugada: ${est.opcionElegida || '—'} (correcta: ${reto.opcionCorrecta ?? 'debate'})`,
+        est.opcionInicial && est.opcionInicial !== est.opcionElegida ? `Inicial: ${est.opcionInicial}` : '',
         est.logica ? `Lógica: ${est.logica}` : '',
       ]
         .filter(Boolean)
@@ -494,6 +516,7 @@ export const estudio: Vista = {
       estadoActual = {
         retoId: siguiente.id,
         paso: 1,
+        opcionInicial: '',
         opcionElegida: '',
         logica: '',
         pistaDesbloqueada: false,
@@ -503,7 +526,7 @@ export const estudio: Vista = {
       ctx.avisar(
         estado === 'solucion'
           ? 'Reto registrado y tarjeta FSRS creada con el modelo mental.'
-          : 'Reto completado. Puedes desplegar su análisis en cualquier momento desde el catálogo.',
+          : `Reto guardado como «${ETIQUETA_ESTADO[estado]}». Puedes desplegar su análisis desde el catálogo.`,
       );
       if (ctx.sub) ctx.ir('#estudio');
       else ctx.pintar();

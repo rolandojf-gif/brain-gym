@@ -40,11 +40,8 @@ export default async (req: Request): Promise<Response> => {
   if (!apiKey) {
     return json({ error: 'Falta configurar OPENROUTER_API_KEY en el servidor de Netlify' }, 500);
   }
-  const envModel = leerEnv('OPENROUTER_MODEL');
-  const model =
-    !envModel || envModel === 'anthropic/claude-3.5-sonnet' || envModel === 'anthropic/claude-sonnet-5.5'
-      ? MODELO_IA_POR_DEFECTO
-      : envModel;
+  // Se usa el modelo configurado tal cual: si el identificador no existe, OpenRouter lo dice y el error llega a la app.
+  const model = leerEnv('OPENROUTER_MODEL') ?? MODELO_IA_POR_DEFECTO;
 
   let res: Response;
   try {

@@ -3,10 +3,15 @@ import {
   BLOQUES_RETOS,
   CATALOGO_RETOS,
   ID_FUENTE_RETOS,
+  estadoAutomatico,
   estadoDeReto,
   fuenteRetos,
   inspeccionarRetoCompletado,
+  intentosContables,
+  letraVisible,
+  opcionesVisibles,
   siguienteRetoPendiente,
+  type Reto,
 } from './catalogo-retos';
 import { nuevo } from './registro';
 import { coleccionesVacias, type EstadoIntento, type Intento } from './tipos';
@@ -45,8 +50,13 @@ describe('catalogo-retos', () => {
       ids.add(r.id);
       expect(r.titulo.length).toBeGreaterThan(5);
       expect(r.escenario.length).toBeGreaterThan(80);
-      expect(r.opciones.length).toBeGreaterThanOrEqual(3);
-      expect(r.opciones.some((o) => o.id === r.opcionCorrecta)).toBe(true);
+      if (r.debate) {
+        expect(r.opcionCorrecta).toBeNull();
+        expect(r.opciones.length).toBeGreaterThanOrEqual(2);
+      } else {
+        expect(r.opciones.length).toBeGreaterThanOrEqual(3);
+        expect(r.opciones.some((o) => o.id === r.opcionCorrecta)).toBe(true);
+      }
       expect(r.pista.length).toBeGreaterThan(20);
       expect(r.solucion.length).toBeGreaterThan(80);
       expect(r.modeloMental.length).toBeGreaterThan(20);
@@ -67,11 +77,61 @@ describe('catalogo-retos', () => {
     expect(CATALOGO_RETOS.map((r) => r.id)).toEqual(esperados);
   });
 
-  it('genera la fuente integrada con 4 capítulos de 8 retos', () => {
+  it('genera la fuente integrada con 4 capítulos; los retos de debate no cuentan en el total', () => {
     const f = fuenteRetos(T0);
     expect(f.id).toBe(ID_FUENTE_RETOS);
     expect(f.capitulos).toHaveLength(4);
-    expect(f.capitulos.every((c) => c.ejercicios === 8)).toBe(true);
+    expect(f.capitulos.map((c) => c.ejercicios)).toEqual([8, 8, 7, 8]);
+  });
+
+  it('la longitud de las opciones no delata la correcta', () => {
+    const conRespuesta = CATALOGO_RETOS.filter((r) => !r.debate);
+    let masLarga = 0;
+    for (const r of conRespuesta) {
+      const ok = r.opciones.find((o) => o.id === r.opcionCorrecta);
+      if (!ok) throw new Error(r.id);
+      const maxOtra = Math.max(...r.opciones.filter((o) => o !== ok).map((o) => o.texto.length));
+      expect(ok.texto.length, r.id).toBeLessThanOrEqual(maxOtra * 1.2);
+      if (ok.texto.length >= maxOtra) masLarga++;
+    }
+    // Al azar, con 3-4 opciones, la correcta sería la más larga en torno a un 30 % de los retos.
+    const proporcion = masLarga / conRespuesta.length;
+    expect(proporcion).toBeGreaterThan(0.15);
+    expect(proporcion).toBeLessThan(0.4);
+  });
+
+  it('baraja las opciones de forma estable y reparte la correcta entre posiciones', () => {
+    const r = CATALOGO_RETOS[0];
+    expect(opcionesVisibles(r)).toEqual(opcionesVisibles(r));
+    expect(opcionesVisibles(r).map((o) => o.letra)).toEqual(['A', 'B', 'C', 'D']);
+    expect(opcionesVisibles(r).map((o) => o.id).sort()).toEqual(r.opciones.map((o) => o.id).sort());
+    const conRespuesta = CATALOGO_RETOS.filter((x) => !x.debate);
+    const posiciones = new Map<string, number>();
+    for (const x of conRespuesta) {
+      const l = letraVisible(x, x.opcionCorrecta) ?? '?';
+      posiciones.set(l, (posiciones.get(l) ?? 0) + 1);
+    }
+    for (const n of posiciones.values()) expect(n / conRespuesta.length).toBeLessThan(0.4);
+  });
+
+  it('deduce el estado del intento: la jugada fijada antes de la pista decide', () => {
+    const r = CATALOGO_RETOS.find((x) => x.id === '1.2') as Reto; // correcta: D
+    expect(estadoAutomatico(r, 'D', 'D', false)).toBe('sin_ayuda');
+    expect(estadoAutomatico(r, 'D', 'D', true)).toBe('sin_ayuda');
+    expect(estadoAutomatico(r, 'C', 'D', true)).toBe('con_pista');
+    expect(estadoAutomatico(r, 'C', 'C', true)).toBe('solucion');
+    expect(estadoAutomatico(r, 'C', 'C', false)).toBe('solucion');
+    const debate = CATALOGO_RETOS.find((x) => x.debate) as Reto;
+    expect(estadoAutomatico(debate, 'A', 'A', false)).toBe('sin_ayuda');
+    expect(estadoAutomatico(debate, 'A', 'B', true)).toBe('con_pista');
+  });
+
+  it('los retos de debate no cuentan en las métricas ni como acierto', () => {
+    const debate = CATALOGO_RETOS.find((x) => x.debate) as Reto;
+    const deDebate = { ...intento(debate.id, 'sin_ayuda'), notaError: 'Jugada: B (correcta: debate)' };
+    const normal = intento('1.1', 'sin_ayuda');
+    expect(intentosContables([deDebate, normal])).toEqual([normal]);
+    expect(inspeccionarRetoCompletado(debate.id, [deDebate])?.acertada).toBe(false);
   });
 
   it('selecciona el siguiente reto pendiente y respeta el filtro de bloque', () => {
@@ -113,7 +173,9 @@ describe('catalogo-retos', () => {
     const ctxFalso = { datos: coleccionesVacias() } as unknown as Ctx;
     const html = renderPanelRevision(ctxFalso, insp);
     expect(html).toContain(insp.reto.escenario);
-    expect(html).toContain('Marcaste la opción C (trampa); la jugada óptima era la D');
+    const c = letraVisible(insp.reto, 'C') ?? '';
+    const d = letraVisible(insp.reto, 'D') ?? '';
+    expect(html).toContain(`Marcaste la opción ${c} (trampa); la jugada óptima era la ${d}`);
     expect(html).toContain(insp.reto.solucion);
     expect(html).toContain(insp.reto.modeloMental);
     expect(html).toContain('[ + Crear tarjeta FSRS con esta regla ]');
