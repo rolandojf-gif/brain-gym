@@ -1,6 +1,6 @@
 /* Fusión de registros entre dispositivos: gana el registro con `actualizado` mayor. Es conmutativa, asociativa e
    idempotente, así que da igual el orden en que lleguen los cambios o si llegan dos veces. */
-import { COLECCIONES, type Base, type Coleccion, type Colecciones } from './tipos';
+import { COLECCIONES, coleccionesDeEsquema, type Base, type Coleccion, type Colecciones } from './tipos';
 
 export function ganador<T extends Base>(a: T, b: T): T {
   if (a.actualizado !== b.actualizado) return a.actualizado > b.actualizado ? a : b;
@@ -38,6 +38,8 @@ export interface EstadoServidor {
 export interface PeticionSync {
   desde: number;
   cambios: Cambio[];
+  /** Versión del esquema del dispositivo. Las apps v1 no la envían. */
+  esquema?: number;
 }
 
 export interface RespuestaSync {
@@ -75,7 +77,7 @@ export function aplicarCambios(estado: EstadoServidor, peticion: PeticionSync): 
   // Se devuelve lo cambiado desde `desde` y lo que ha ganado a un cambio enviado, salvo lo que el dispositivo
   // acaba de enviar y ha quedado (ya lo tiene).
   const cambios: Cambio[] = [];
-  for (const c of COLECCIONES) {
+  for (const c of coleccionesDeEsquema(peticion.esquema ?? 1)) {
     for (const { seq: s, registro } of Object.values(registros[c] ?? {})) {
       const clave = `${c}:${registro.id}`;
       if ((s > peticion.desde || perdedores.has(clave)) && !aplicados.has(clave)) cambios.push({ coleccion: c, registro });

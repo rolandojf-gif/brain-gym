@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { actualizar, borrar, nuevo } from './registro';
 import { aplicarCambios, estadoVacio, fusionar, fusionarColeccion, ganador } from './sincronizacion';
-import { coleccionesVacias, type Base } from './tipos';
+import { COLECCIONES, coleccionesDeEsquema, coleccionesVacias, type Base } from './tipos';
 
 type R = Base & { v: string };
 const t = (min: number) => new Date(Date.UTC(2026, 9, 26, 9, min));
@@ -87,5 +87,24 @@ describe('servidor de sincronización', () => {
   it('ignora colecciones desconocidas', () => {
     const { modificado } = aplicarCambios(estadoVacio(), { desde: 0, cambios: [{ coleccion: 'rara' as never, registro: r('a', 'x') }] });
     expect(modificado).toBe(false);
+  });
+
+  it('una app v1 (sin esquema) no recibe colecciones que no conoce; una v2 sí', () => {
+    const conReto = aplicarCambios(estadoVacio(), {
+      desde: 0,
+      esquema: 2,
+      cambios: [{ coleccion: 'retos', registro: r('g1', 'reto') }, { coleccion: 'tarjetas', registro: r('t1', 'tarjeta') }],
+    }).estado;
+    const v1 = aplicarCambios(conReto, { desde: 0, cambios: [] }).respuesta.cambios.map((c) => c.coleccion);
+    expect(v1).toEqual(['tarjetas']);
+    const v2 = aplicarCambios(conReto, { desde: 0, cambios: [], esquema: 2 }).respuesta.cambios.map((c) => c.coleccion).sort();
+    expect(v2).toEqual(['retos', 'tarjetas']);
+  });
+
+  it('colecciones por esquema: v1 sin retos; actual o futura, todas', () => {
+    expect(coleccionesDeEsquema(1)).not.toContain('retos');
+    expect(coleccionesDeEsquema(1)).toHaveLength(COLECCIONES.length - 1);
+    expect(coleccionesDeEsquema(2)).toEqual(COLECCIONES);
+    expect(coleccionesDeEsquema(99)).toEqual(COLECCIONES);
   });
 });

@@ -47,6 +47,8 @@ describe('/api/sync', () => {
     expect((await handler(peticion(null, TOKEN, 'GET'))).status).toBe(405);
     expect((await handler(peticion({ desde: 'x', cambios: [] }))).status).toBe(400);
     expect((await handler(peticion({ desde: 0, cambios: [{ coleccion: 'tarjetas', registro: {} }] }))).status).toBe(400);
+    expect((await handler(peticion({ desde: 0, cambios: [], esquema: 'dos' }))).status).toBe(400);
+    expect((await handler(peticion({ desde: 0, cambios: [], esquema: 2 }))).status).toBe(200);
   });
 
   it('guarda los cambios y los devuelve a otro dispositivo', async () => {

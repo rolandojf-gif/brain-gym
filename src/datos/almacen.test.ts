@@ -1,9 +1,10 @@
 import 'fake-indexeddb/auto';
+import { openDB } from 'idb';
 import { afterEach, describe, expect, it } from 'vitest';
 import { nuevaTarjeta } from '../dominio/fsrs';
-import { actualizar } from '../dominio/registro';
+import { actualizar, nuevo } from '../dominio/registro';
 import { aplicarCambios, estadoVacio, type EstadoServidor, type PeticionSync } from '../dominio/sincronizacion';
-import { ESQUEMA_VERSION, type Tarjeta } from '../dominio/tipos';
+import { ESQUEMA_VERSION, type RetoGenerado, type Tarjeta } from '../dominio/tipos';
 import { Almacen } from './almacen';
 import { ErrorDeSync, sincronizar } from './sincronizar';
 
@@ -91,6 +92,30 @@ describe('Almacen', () => {
     expect(await a.leer('tarjetas')).toHaveLength(1);
   });
 
+  it('abre una base v1 (IndexedDB 1, esquema 1): crea la tienda de retos, conserva los datos y vuelve a pedir todo al servidor', async () => {
+    const nombre = 'bg-v1';
+    const v1 = ['ajustes', 'fuentes', 'intentos', 'lecturas', 'escritos', 'tarjetas', 'repasos', 'predicciones', 'sesiones', 'aprendizajes'];
+    const db = await openDB(nombre, 1, {
+      upgrade(d) {
+        for (const c of v1) d.createObjectStore(c, { keyPath: 'id' });
+        d.createObjectStore('meta');
+        d.createObjectStore('pendientes');
+      },
+    });
+    const tarjeta = nuevaTarjeta('de la v1', 'r', T0);
+    await db.put('tarjetas', tarjeta);
+    await db.put('meta', 1, 'esquema');
+    await db.put('meta', 7, 'cursor');
+    db.close();
+
+    const a = await abrir(nombre);
+    expect(await a.leer('retos')).toEqual([]);
+    expect(await a.leer('tarjetas')).toEqual([tarjeta]);
+    expect(await a.meta('esquema')).toBe(ESQUEMA_VERSION);
+    expect(await a.meta('cursor')).toBe(0);
+    expect((await a.copiaPrevia())?.esquema).toBe(1);
+  });
+
   it('se niega a abrir datos de un esquema más nuevo', async () => {
     const nombre = 'bg-futuro';
     const a = await abrir(nombre);
@@ -125,6 +150,20 @@ describe('sincronizar', () => {
     // Ajustes, fuentes y lecturas semilla sembrados en los dos dispositivos se funden en uno sin duplicarse.
     expect(await mac.leer('fuentes')).toHaveLength(1);
     expect(await mac.leer('lecturas')).toHaveLength(12);
+  });
+
+  it('un reto generado en el Mac llega al móvil', async () => {
+    const srv = servidor();
+    const mac = await abrir(), movil = await abrir();
+    for (const d of [mac, movil]) await d.ponerMeta('token', 'x'.repeat(40));
+    const reto: RetoGenerado = nuevo({
+      tema: '5', titulo: 'Pausa unilateral', escenario: 'e', opciones: [], opcionCorrecta: null, pista: 'p', solucion: 's',
+      modeloMental: 'm', fuente: { titulo: 'f', url: 'https://example.org' }, modelo: 'x', revision: 'ok',
+    }, T0);
+    await mac.guardar({ coleccion: 'retos', registro: reto });
+    await sincronizar(mac, { fetch: srv.fetch });
+    await sincronizar(movil, { fetch: srv.fetch });
+    expect(await movil.leer('retos')).toEqual([reto]);
   });
 
   it('una edición posterior en el móvil gana a la del Mac', async () => {
