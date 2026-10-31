@@ -6,7 +6,7 @@
 [build.environment]
   NODE_VERSION = "22"
   # OPENROUTER_MODEL contiene el identificador público del modelo (ej. anthropic/claude-3.5-sonnet), no un secreto.
-  SECRETS_SCAN_OMIT_KEYS = "OPENROUTER_MODEL"
+  SECRETS_SCAN_OMIT_KEYS = "OPENROUTER_MODEL,OPENROUTER_MODEL_REVISOR"
 
 [[headers]]
   for = "/*"

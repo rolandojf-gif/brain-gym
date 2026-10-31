@@ -11,9 +11,9 @@ Navegador (Mac o móvil, PWA)                         Netlify
 │   ↓ llaman a                         │        │                          │
 │ Dominio puro (src/dominio/*)         │        │ /api/sync  (función)     │
 │   FSRS, Brier, calibración,          │  HTTPS │   token Bearer           │
-│   sesión del día, migraciones        │ ─────▶ │   Netlify Blobs          │
+│   rotación de temas, migraciones     │ ─────▶ │   Netlify Blobs          │
 │   ↓                                  │        │                          │
-│ Almacén (src/datos/*): IndexedDB     │        │ /api/ia    (Fase 2)      │
+│ Almacén (src/datos/*): IndexedDB     │        │ /api/ia, /api/retos      │
 │   cola de cambios para sincronizar   │        │   → OpenRouter           │
 └──────────────────────────────────────┘        └──────────────────────────┘
 ```
@@ -84,15 +84,22 @@ Objetivo: lo más simple que sea correcto para un usuario con dos dispositivos.
 - **Cuándo:** al abrir la app, al volver a ella y tras cada sesión terminada, si hay conexión. Sin conexión, todo funciona y la cola espera.
 - **Riesgo conocido:** si repasas la misma tarjeta en los dos dispositivos sin conexión, el estado FSRS de una de las dos se pierde (los dos registros de repaso se conservan). Es raro con un solo usuario; si pasa, se puede recalcular el estado desde los repasos con `ts-fsrs`.
 
-## Sesión del día
+## Hoy
 
-`sesionDeHoy(ahora, ajustes, datos)` es pura y devuelve:
+Un menú, no una agenda: un reto, una lectura y una idea, más una línea discreta si hay tarjetas vencidas. El tema del reto lo da `temaSiguiente(intentos)` (`src/dominio/catalogo-retos.ts`): el bloque siguiente al del último reto jugado, en orden circular, saltando los que no tienen retos por estrenar. El selector de Hoy lo cambia hasta que se juega otro reto.
 
-1. Las actividades del plan para el día de la semana del día lógico (corte a las 04:00 por defecto).
-2. Lo pendiente: tarjetas vencidas, predicciones vencidas sin resolver y la calibración si hoy no toca pero no se ha hecho en los últimos 7 días.
-3. Lo ya hecho hoy (sesiones registradas), para marcarlo.
+## Funciones de IA
 
-Las sesiones no hechas de días anteriores no se arrastran.
+Las dos funciones comparten `netlify/servidor.ts` (token, variables de entorno, llamada a OpenRouter y cupo) y la misma `OPENROUTER_API_KEY`.
+
+- **`/api/ia`:** el Abogado del Diablo de las lecturas. Una llamada por petición.
+- **`/api/retos`:** genera un reto sobre un tema (`{ tema, vistos }`). Un solo intento por petición, porque una función síncrona de Netlify tiene 60 s:
+  1. **Generar** con `OPENROUTER_MODEL` (temperatura 0,8). El prompt pide cuatro opciones de longitud parecida, un «por qué» en cada una, una sola defendible (o `null` en un debate) y una fuente real con URL pública.
+  2. **Validar** la forma (`validarRetoPropuesto`): letras A–D, sin opciones repetidas, la correcta no más de 1,3 veces más larga que el distractor más largo (para que no se delate) y URL `https` de un dominio con nombre.
+  3. **Comprobar la fuente:** una petición GET de 6 s. Vale si responde por debajo de 400 o con 401/403/429 (existe, pero bloquea a robots); sólo se mira el código, no el contenido.
+  4. **Revisar** con `OPENROUTER_MODEL_REVISOR` (por defecto, el mismo modelo; uno de otra familia detecta mejor los errores), temperatura 0. Si hay más de una opción defendible o la fuente no respalda la solución, se descarta.
+  Un fallo en 2, 3 o 4 responde 422 con `motivo` (`formato`, `fuente`, `revisor`); la app vuelve a pedir más tarde, en segundo plano.
+- **Cupo diario:** 40 llamadas a OpenRouter por día UTC entre las dos funciones (`MAX_LLAMADAS_IA_DIA`), en el blob `cupo-ia` con la misma escritura condicional que la sincronización. Un reto gasta una llamada si se descarta antes del revisor y dos si llega a él. Agotado, responde 429. Es un freno ante un bucle o un token filtrado; el límite de gasto real es el de la clave en OpenRouter.
 
 ## Móvil
 

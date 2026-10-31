@@ -47,7 +47,7 @@ Variable de entorno en Netlify: `BG_TOKEN` (mínimo 32 caracteres; generar con `
 - Tests de IndexedDB con `fake-indexeddb`.
 - PWA: `public/manifest.webmanifest` y `public/sw.js` (escrito a mano, sin dependencias). Si cambia la lista de archivos base o la estrategia del service worker, subir `CACHE` (`bg-vN`). El service worker sólo se registra en producción.
 - Lógica de dominio con tests obligatorios: FSRS, catálogo de retos (incluida la rotación de temas), estudio, calibración, migraciones, fusión de sincronización.
-- Nombres de dominio en español (`sesionDeHoy`, `intentos`, `CATALOGO_RETOS`); el código de librerías externas, como venga.
+- Nombres de dominio en español (`temaSiguiente`, `intentos`, `CATALOGO_RETOS`); el código de librerías externas, como venga.
 - Modelo de datos versionado: se conservan el almacén `predicciones`, la colección `sesiones` y `ajustes.planSemanal` por retrocompatibilidad con exportaciones y sincronizaciones existentes aunque ya no estén en la interfaz. Un campo opcional nuevo no sube el esquema; un cambio incompatible o una colección nueva, sí (ver `docs/arquitectura.md`).
 - Fechas en ISO 8601. El «día» de la rutina es el día lógico de `src/lib/dia.ts` (corte a las 04:00).
 - Comentarios en español, breves, que expliquen el porqué.

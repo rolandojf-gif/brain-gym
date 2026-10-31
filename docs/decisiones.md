@@ -18,10 +18,13 @@ Con datos personales en la nube (sincronización), las funciones deben estar pro
 - El sitio estático no contiene datos personales: sin token, sólo se ve una app vacía.
 - Descartado: la protección por contraseña de Netlify (de pago y no protege mejor las funciones).
 
-## D3. Feedback de IA (Fase 2) · propuesta
+## D3. IA vía OpenRouter · decidida (31 oct 2026)
 
-- Función de Netlify → OpenRouter, protegida con el mismo token. Clave de OpenRouter dedicada a esta app con límite de crédito propio, `max_tokens` fijo y tope de llamadas diarias en la función. Modelo por variable de entorno.
-- **Gemini:** se puede usar un modelo Gemini a través de OpenRouter sin otra clave. Una API de Gemini directa sólo tendría sentido por su nivel gratuito, y en ese nivel Google puede usar el contenido para mejorar sus productos (según sus condiciones; comprobar la versión vigente antes de decidir). Con textos personales no lo recomiendo. Se decide al empezar la Fase 2.
+- Funciones de Netlify → OpenRouter, protegidas con el mismo token: `/api/ia` (Abogado del Diablo) y `/api/retos` (retos generados). Una sola `OPENROUTER_API_KEY`, dedicada a esta app y con límite de crédito propio en OpenRouter. `max_tokens` fijo en cada llamada.
+- **Tope de 40 llamadas al día** entre las dos funciones, contado en Netlify Blobs. Frena un bucle o un token filtrado; el límite de gasto lo pone la clave.
+- **Modelos por variable de entorno:** `OPENROUTER_MODEL` genera; `OPENROUTER_MODEL_REVISOR`, opcional, revisa los retos. Conviene que el revisor sea de otra familia que el generador, porque comparten menos puntos ciegos.
+- **Cada reto generado pasa tres filtros** antes de llegar a la app: forma válida, fuente que responde y aprobación del revisor. Detalle en `docs/arquitectura.md`.
+- **Gemini:** se puede usar un modelo Gemini a través de OpenRouter sin otra clave. Una API de Gemini directa sólo tendría sentido por su nivel gratuito, y en ese nivel Google puede usar el contenido para mejorar sus productos (según sus condiciones; comprobar la versión vigente antes de decidir). Con textos personales no lo recomiendo.
 
 ## D4. Concepto del día · propuesta
 

@@ -4,6 +4,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Almacen } from '../src/datos/almacen';
 import { ErrorDeIa, auditarConIa } from '../src/datos/ia';
 import { MAX_CARACTERES_IA, SYSTEM_PROMPT_ABOGADO_DIABLO } from '../src/dominio/ia';
+import { MAX_LLAMADAS_IA_DIA } from '../src/dominio/retos-ia';
+
+/* Netlify Blobs en memoria para el cupo diario de IA, con escritura condicional como el real. */
+const blobs = vi.hoisted(() => {
+  const m = { valor: undefined as unknown, etag: 0 };
+  const store = {
+    async getWithMetadata() {
+      return m.valor === undefined ? null : { data: structuredClone(m.valor), etag: String(m.etag), metadata: {} };
+    },
+    async setJSON(_k: string, v: unknown, o: { onlyIfMatch?: string; onlyIfNew?: boolean }) {
+      if (o.onlyIfNew && m.valor !== undefined) return { modified: false };
+      if (o.onlyIfMatch !== undefined && o.onlyIfMatch !== String(m.etag)) return { modified: false };
+      m.valor = structuredClone(v);
+      m.etag++;
+      return { modified: true, etag: String(m.etag) };
+    },
+  };
+  return { m, store };
+});
+vi.mock('@netlify/blobs', () => ({ getStore: () => blobs.store }));
 
 const { default: handler } = await import('./functions/ia.mjs');
 
@@ -30,6 +50,7 @@ const peticion = (cuerpo: unknown, token = TOKEN, method = 'POST') =>
   });
 
 beforeEach(() => {
+  Object.assign(blobs.m, { valor: undefined, etag: 0 });
   process.env.BG_TOKEN = TOKEN;
   process.env.OPENROUTER_API_KEY = 'sk-or-test-key';
   process.env.OPENROUTER_MODEL = 'deepseek/deepseek-v4.1-flash-1017';
@@ -105,6 +126,21 @@ describe('/api/ia', () => {
     expect(body.error).toContain('HTTP 400');
     expect(body.error).toContain('anthropic/modelo-inexistente-test');
     expect(body.error).toContain('is not a valid model ID');
+  });
+
+  it('descuenta del cupo diario compartido y responde 429 cuando se agota', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(respuestaModelo) } }] }), { status: 200 }),
+    );
+    expect((await handler(peticion(cuerpoValido))).status).toBe(200);
+    expect(blobs.m.valor).toMatchObject({ usadas: 1 });
+
+    blobs.m.valor = { dia: new Date().toISOString().slice(0, 10), usadas: MAX_LLAMADAS_IA_DIA };
+    spy.mockClear();
+    const res = await handler(peticion(cuerpoValido));
+    expect(res.status).toBe(429);
+    expect(((await res.json()) as { error: string }).error).toContain('Tope diario');
+    expect(spy).not.toHaveBeenCalled();
   });
 });
 
