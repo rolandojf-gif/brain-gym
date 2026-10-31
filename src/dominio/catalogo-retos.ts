@@ -748,7 +748,8 @@ export function inspeccionarRetoCompletado(retoId: string, intentos: readonly In
 
   const matchJugada = intento.notaError.match(/Jugada:\s*([A-D])/i);
   const opcionElegida = matchJugada?.[1]?.toUpperCase() ?? (intento.estado === 'sin_ayuda' ? reto.opcionCorrecta : null);
-  const matchLogica = intento.notaError.match(/Lógica:\s*(.+)$/i);
+  // «Lógica:» es el formato anterior (razonamiento tras ver las opciones); «Antes de ver opciones:», el actual.
+  const matchLogica = intento.notaError.match(/(?:Lógica|Antes de ver opciones):\s*(.+)$/i);
   const logica = matchLogica?.[1]?.trim() ?? '';
   const acertada = !reto.debate && opcionElegida === reto.opcionCorrecta;
 

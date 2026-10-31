@@ -180,5 +180,19 @@ describe('catalogo-retos', () => {
     expect(html).toContain(insp.reto.modeloMental);
     expect(html).toContain('[ + Crear tarjeta FSRS con esta regla ]');
     expect(html).toContain('[ Reintentar reto ]');
+    expect(html).toContain('Lo que escribiste: «Equilibrio de Nash en cero»');
+  });
+
+  it('lee el texto escrito antes de ver las opciones (formato actual), aunque cambiara de jugada', () => {
+    const i: Intento = nuevo(
+      {
+        fuenteId: ID_FUENTE_RETOS, capitulo: '1', ejercicio: '1.2', estado: 'con_pista', segundos: 60, dia: '2026-10-31',
+        notaError: 'Jugada: D (correcta: D) · Inicial: C · Antes de ver opciones: castigar al que no coopera · y vigilar',
+      },
+      T0,
+    );
+    const insp = inspeccionarRetoCompletado('1.2', [i]);
+    expect(insp?.opcionElegida).toBe('D');
+    expect(insp?.logica).toBe('castigar al que no coopera · y vigilar');
   });
 });
