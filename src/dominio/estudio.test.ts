@@ -17,7 +17,7 @@ describe('estudio / retos', () => {
     expect(u[0]?.estado).toBe('sin_ayuda');
   });
 
-  it('progreso por bloque temático (4 bloques de 8 retos)', () => {
+  it('progreso por bloque temático (4 bloques; el 3 tiene un reto de debate que no cuenta)', () => {
     const p = progresoPorCapitulo(catalogo, [
       intento('1', '1.1', 'sin_ayuda', 0),
       intento('1', '1.2', 'con_pista', 1),
@@ -26,7 +26,7 @@ describe('estudio / retos', () => {
     expect(p).toHaveLength(4);
     expect(p[0]).toMatchObject({ intentados: 2, sinAyuda: 1, conPista: 1, conSolucion: 0, total: 8 });
     expect(p[1]).toMatchObject({ intentados: 1, sinAyuda: 0, conPista: 0, conSolucion: 1, total: 8 });
-    expect(p[2]).toMatchObject({ intentados: 0, total: 8 });
+    expect(p[2]).toMatchObject({ intentados: 0, total: 7 });
   });
 
   it('proporción sin ayuda y desglose de resolución sobre todos los intentos', () => {

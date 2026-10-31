@@ -1,7 +1,7 @@
 /* 05 · Progreso: continuidad real (calendario de sesiones hechas), tasa de resolución de retos
    (sin ayuda vs con pista vs solución y desglose por los 4 bloques temáticos) y madurez del mazo FSRS + lecturas 3x1. */
 import type { Vista } from '../app';
-import { fuenteRetos } from '../dominio/catalogo-retos';
+import { fuenteRetos, intentosContables } from '../dominio/catalogo-retos';
 import { desgloseResolucion, progresoPorCapitulo } from '../dominio/estudio';
 import { calendario, madurezMazo } from '../dominio/progreso';
 import type { Actividad } from '../dominio/tipos';
@@ -27,8 +27,10 @@ export const progreso: Vista = {
       .join('');
 
     const fuente = fuenteRetos(ctx.ahora);
-    const desglose = desgloseResolucion(ctx.datos.intentos);
-    const porBloque = progresoPorCapitulo(fuente, ctx.datos.intentos);
+    // Los retos de debate no tienen acierto posible: no entran en las tasas.
+    const contables = intentosContables(ctx.datos.intentos);
+    const desglose = desgloseResolucion(contables);
+    const porBloque = progresoPorCapitulo(fuente, contables);
     const mazo = madurezMazo(ctx.datos.tarjetas, ctx.datos.repasos);
     const escritos = ctx.datos.escritos.filter((e) => !e.borrado).length;
     const aprendizajes = ctx.datos.aprendizajes.filter((a) => !a.borrado).length;
