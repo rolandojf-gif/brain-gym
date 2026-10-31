@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { NIVELES_CONFIANZA, brier, brierPorCategoria, calibracionRetos, curva, pideConfianza, porResolver, resueltas, resueltasDeRetos } from './calibracion';
-import { ID_FUENTE_RETOS } from './catalogo-retos';
+import { CATALOGO_RETOS, ID_FUENTE_RETOS, retoDeGenerado } from './catalogo-retos';
 import { nuevo } from './registro';
-import type { EstadoIntento, Intento, Prediccion, Resultado } from './tipos';
+import type { EstadoIntento, Intento, Prediccion, Resultado, RetoGenerado } from './tipos';
 
 const T0 = new Date('2026-10-26T09:00:00Z');
 const pred = (probabilidad: number, resultado?: Resultado, venceEl = '2026-11-01'): Prediccion =>
@@ -85,7 +85,7 @@ describe('calibración en retos', () => {
       intento('1.1', 'sin_ayuda', 0, 0.9),
       intento('1.2', 'con_pista', 1, 0.6),
       intento('1.3', 'solucion', 2, 0.3),
-    ])).toEqual([
+    ], CATALOGO_RETOS)).toEqual([
       { probabilidad: 0.9, ocurrio: true },
       { probabilidad: 0.6, ocurrio: false },
       { probabilidad: 0.3, ocurrio: false },
@@ -93,11 +93,11 @@ describe('calibración en retos', () => {
   });
 
   it('sólo cuenta el primer intento de cada reto, aunque el primero no tenga confianza', () => {
-    expect(resueltasDeRetos([intento('1.1', 'sin_ayuda', 5, 0.9), intento('1.1', 'solucion', 0, 0.6)])).toEqual([
+    expect(resueltasDeRetos([intento('1.1', 'sin_ayuda', 5, 0.9), intento('1.1', 'solucion', 0, 0.6)], CATALOGO_RETOS)).toEqual([
       { probabilidad: 0.6, ocurrio: false },
     ]);
     // Primer intento anterior a la confianza: el reintento ya conoce la solución y no cuenta.
-    expect(resueltasDeRetos([intento('1.2', 'solucion', 0), intento('1.2', 'sin_ayuda', 5, 0.9)])).toEqual([]);
+    expect(resueltasDeRetos([intento('1.2', 'solucion', 0), intento('1.2', 'sin_ayuda', 5, 0.9)], CATALOGO_RETOS)).toEqual([]);
   });
 
   it('excluye debates, borrados, otras fuentes y confianzas fuera de rango', () => {
@@ -108,11 +108,23 @@ describe('calibración en retos', () => {
       otraFuente,
       intento('1.2', 'sin_ayuda', 2, 1.5),
       intento('1.3', 'sin_ayuda', 4, Number.NaN),
-    ])).toEqual([]);
+    ], CATALOGO_RETOS)).toEqual([]);
+  });
+
+  it('excluye los retos generados reportados como erróneos', () => {
+    const g: RetoGenerado = nuevo({
+      tema: '5', titulo: 'g', escenario: 'e', opciones: (['A', 'B', 'C', 'D'] as const).map((id) => ({ id, texto: id, porQue: id })),
+      opcionCorrecta: 'A', pista: 'p', solucion: 's', modeloMental: 'm', fuente: { titulo: 'f', url: 'https://es.wikipedia.org/wiki/X' },
+      modelo: 'x', revision: 'ok',
+    }, T0);
+    const intentoG: Intento = { ...intento(g.id, 'sin_ayuda', 0, 0.9), capitulo: '5' };
+    expect(resueltasDeRetos([intentoG], [...CATALOGO_RETOS, retoDeGenerado(g)])).toHaveLength(1);
+    const reportado = retoDeGenerado({ ...g, reporte: { nota: 'B también vale', el: T0.toISOString() } });
+    expect(resueltasDeRetos([intentoG], [...CATALOGO_RETOS, reportado])).toEqual([]);
   });
 
   it('el borrado del primer intento deja contar al siguiente', () => {
-    expect(resueltasDeRetos([{ ...intento('1.1', 'solucion', 0, 0.6), borrado: true }, intento('1.1', 'sin_ayuda', 5, 0.9)])).toEqual([
+    expect(resueltasDeRetos([{ ...intento('1.1', 'solucion', 0, 0.6), borrado: true }, intento('1.1', 'sin_ayuda', 5, 0.9)], CATALOGO_RETOS)).toEqual([
       { probabilidad: 0.9, ocurrio: true },
     ]);
   });
@@ -123,7 +135,7 @@ describe('calibración en retos', () => {
       intento('1.2', 'solucion', 1, 0.9),
       intento('1.3', 'con_pista', 2, 0.6),
       intento('1.5', 'sin_ayuda', 3, 0.3),
-    ]);
+    ], CATALOGO_RETOS);
     expect(c.n).toBe(4);
     // (0,01 + 0,81 + 0,36 + 0,49) / 4
     expect(c.brier).toBeCloseTo(0.4175, 10);
@@ -141,7 +153,7 @@ describe('calibración en retos', () => {
   });
 
   it('sin datos, todo nulo', () => {
-    expect(calibracionRetos([])).toMatchObject({ n: 0, brier: null, sesgo: null, margen: null, niveles: [] });
+    expect(calibracionRetos([], CATALOGO_RETOS)).toMatchObject({ n: 0, brier: null, sesgo: null, margen: null, niveles: [] });
   });
 
   it('pide confianza sólo en el primer intento de un reto con respuesta correcta', () => {

@@ -250,6 +250,12 @@ table.cap td { padding: 6px 8px; }
 .reto-explicacion p { margin: 0; font-size: 16px; line-height: 1.6; }
 .reto-modelo { background: var(--card-2); border: 2px solid var(--ink); border-left: 8px solid var(--ok); padding: 12px 14px; }
 .reto-modelo p { margin: 4px 0 0; font-size: 16px; }
+/* Retos generados: el «por qué» de cada opción, la fuente y el «esto está mal». */
+.op-porque { display: block; margin-top: 6px; font: 400 14px/1.45 var(--f-body); color: var(--muted); }
+.reto-fuente { margin: 0; overflow-wrap: anywhere; }
+.reto-fuente a { color: inherit; }
+.reto-reporte summary { cursor: pointer; font: 400 12px/1.4 var(--f-mono); color: var(--muted); text-decoration: underline; width: fit-content; }
+.reto-reporte[open] summary { margin-bottom: 10px; }
 .bloque-cat { display: flex; flex-direction: column; gap: 10px; }
 .bloque-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .bloque-head h3 { font: 700 18px/1.2 var(--f-head); margin: 2px 0 4px; }

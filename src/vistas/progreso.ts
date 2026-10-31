@@ -2,7 +2,7 @@
    Sin calendario ni tasas de acierto: el detalle por reto está en Retos. */
 import type { Vista } from '../app';
 import { calibracionRetos, type CalibracionRetos } from '../dominio/calibracion';
-import { BLOQUES_RETOS, CATALOGO_RETOS, ID_FUENTE_RETOS } from '../dominio/catalogo-retos';
+import { BLOQUES_RETOS, CATALOGO_RETOS, ID_FUENTE_RETOS, todosLosRetos } from '../dominio/catalogo-retos';
 import { madurezMazo } from '../dominio/progreso';
 import { fmtNum, fmtPct, plural } from '../lib/fmt';
 import { esc } from '../lib/html';
@@ -50,9 +50,15 @@ function panelCalibracion(c: CalibracionRetos): string {
 export const progreso: Vista = {
   titulo: 'Progreso',
   render(ctx) {
+    const retos = todosLosRetos(ctx.datos.retos);
     const jugados = new Set(ctx.datos.intentos.filter((i) => !i.borrado && i.fuenteId === ID_FUENTE_RETOS).map((i) => i.ejercicio));
-    const porTema = BLOQUES_RETOS.map((b) => `${b.corto} ${CATALOGO_RETOS.filter((r) => r.bloque === b.id && jugados.has(r.id)).length}`).join(' · ');
-    const totalJugados = CATALOGO_RETOS.filter((r) => jugados.has(r.id)).length;
+    const jugadosDe = (lista: readonly { id: string }[]) => lista.filter((r) => jugados.has(r.id)).length;
+    const porTema = BLOQUES_RETOS.map((b) => ({ b, n: jugadosDe(retos.filter((r) => r.bloque === b.id)) }))
+      .filter(({ b, n }) => n > 0 || b.id !== '5')
+      .map(({ b, n }) => `${b.corto} ${n}`)
+      .join(' · ');
+    const totalJugados = jugadosDe(retos);
+    const delCatalogo = jugadosDe(CATALOGO_RETOS);
     const mazo = madurezMazo(ctx.datos.tarjetas, ctx.datos.repasos);
     const escritos = ctx.datos.escritos.filter((e) => !e.borrado).length;
     const ideas = ctx.datos.aprendizajes.filter((a) => !a.borrado).length;
@@ -64,8 +70,8 @@ export const progreso: Vista = {
         <div class="kpis">
           <div class="kpi">
             <span class="k">Retos jugados</span>
-            <span class="v">${totalJugados} / ${CATALOGO_RETOS.length}</span>
-            <span class="s">${esc(porTema)}</span>
+            <span class="v">${totalJugados}</span>
+            <span class="s">${esc(porTema)} · ${delCatalogo} de los ${CATALOGO_RETOS.length} del catálogo</span>
           </div>
           <div class="kpi">
             <span class="k">Tarjetas aprendidas</span>
@@ -80,7 +86,7 @@ export const progreso: Vista = {
         </div>
 
         <h2 class="sec">Calibración en retos</h2>
-        ${panelCalibracion(calibracionRetos(ctx.datos.intentos))}
+        ${panelCalibracion(calibracionRetos(ctx.datos.intentos, retos))}
       </section>`;
   },
 };

@@ -49,7 +49,7 @@ Colecciones:
 | `predicciones` | `enunciado`, `probabilidad` (0–1), `venceEl`, `categoria`, `resolucion?: {resultado, resueltaEl}` | `resultado = 'si' \| 'no' \| 'anulada'`. Las anuladas no entran en el Brier. |
 | `sesiones` | `dia`, `actividad`, `inicio`, `fin?`, `segundos` | Una por actividad hecha, con el tiempo dedicado. Ya no la muestra ninguna vista (salió el calendario), pero se sigue guardando y exportando. |
 | `aprendizajes` | `dia`, `texto`, `fuenteUrl?`, `tarjetaId?` | «Qué aprendí hoy». |
-| `retos` (v2) | `tema` (`'1'…'5'`), `titulo`, `escenario`, `opciones: {id, texto, porQue}[]`, `opcionCorrecta` (`null` en debates), `pista`, `solucion`, `modeloMental`, `fuente: {titulo, url}`, `modelo`, `revision`, `reporte?: {nota, el}` | Retos generados por IA. Se guardan enteros porque son contenido de la app, no externo. Sus intentos van a `intentos` con `ejercicio = id`. Si está «listo» (sin intentos) o jugado se deduce de los intentos, no se guarda. `reporte` es el «esto está mal». |
+| `retos` (v2) | `tema` (`'1'…'5'`), `titulo`, `escenario`, `opciones: {id, texto, porQue}[]`, `opcionCorrecta` (`null` en debates), `pista`, `solucion`, `modeloMental`, `fuente: {titulo, url}`, `modelo`, `revision`, `reporte?: {nota, el}` | Retos generados por IA. Se guardan enteros porque son contenido de la app, no externo. Sus intentos van a `intentos` igual que los del catálogo: `fuenteId = 'catalogo-retos'`, `capitulo = tema`, `ejercicio = id`. Si está «listo» (sin intentos) o jugado se deduce de los intentos, no se guarda. `reporte` es el «esto está mal»: el reto no se vuelve a ofrecer y sus intentos salen de las métricas. |
 
 Lo que se calcula y no se guarda: Brier y calibración (de predicciones y de retos), progreso por capítulo y el tema que toca en la rotación de retos.
 
@@ -86,7 +86,14 @@ Objetivo: lo más simple que sea correcto para un usuario con dos dispositivos.
 
 ## Hoy
 
-Un menú, no una agenda: un reto, una lectura y una idea, más una línea discreta si hay tarjetas vencidas. El tema del reto lo da `temaSiguiente(intentos)` (`src/dominio/catalogo-retos.ts`): el bloque siguiente al del último reto jugado, en orden circular, saltando los que no tienen retos por estrenar. El selector de Hoy lo cambia hasta que se juega otro reto.
+Un menú, no una agenda: un reto, una lectura y una idea, más una línea discreta si hay tarjetas vencidas. El tema del reto lo da `temaSiguiente(intentos, retos)` (`src/dominio/catalogo-retos.ts`): el tema siguiente al del último reto jugado, en orden circular, saltando los que no tienen retos por estrenar. El selector de Hoy lo cambia hasta que se juega otro reto. Un tema sin ningún reto (la carrera por la AGI antes del primer generado) no se ofrece.
+
+## Retos: catálogo y generados
+
+- **Un solo tipo en la interfaz:** `todosLosRetos(generados)` une el catálogo y los generados vivos con la forma `Reto` (`retoDeGenerado`); `retosJugables` quita los marcados como erróneos. El ring, la revisión, la rotación y la calibración trabajan sobre esa lista.
+- **Mezcla (decidida el 31 oct 2026, «Alternar»):** en cada tema, si el último reto jugado era del catálogo toca uno generado, y al revés; sin historial en el tema, el catálogo; si no queda del tipo que toca, el otro (`siguienteRetoPendiente`).
+- **Reposición en segundo plano** (`src/datos/retos-ia.ts`): tras cada sincronización, el `Reponedor` pide a `/api/retos` un reto por cada tema que no tenga uno generado listo, de uno en uno y empezando por los temas sin nada por estrenar. Lo guarda sin repintar, para no cambiar la pantalla mientras se usa. Topes por sesión de la app: 10 peticiones y 2 descartes seguidos por tema. Sin red, lo vuelve a intentar en la próxima sincronización; con el tope diario agotado, al día siguiente (UTC); con la clave mal o el servidor roto, no hasta reiniciar la app o cambiar la clave. El último estado se ve en la pestaña Datos.
+- Si los dos dispositivos reponen a la vez antes de sincronizar, puede quedar algún reto de más en un tema: no se pierde nada y se juega después.
 
 ## Funciones de IA
 

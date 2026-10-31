@@ -1,20 +1,21 @@
 /* 01 · Hoy: un menú, no una agenda. Tres cosas para elegir (un reto, una lectura, una idea) y, si hay tarjetas
    vencidas, una línea discreta para repasarlas. Nada se marca como pendiente ni hecho. */
 import { accion, campos, type Ctx, type Vista } from '../app';
-import { BLOQUES_RETOS, siguienteRetoPendiente, temaSiguiente, type BloqueRetos } from '../dominio/catalogo-retos';
+import { BLOQUES_RETOS, CATALOGO_RETOS, retosJugables, siguienteRetoPendiente, temaSiguiente, todosLosRetos, type Reto } from '../dominio/catalogo-retos';
 import { nuevaTarjeta, vencidas } from '../dominio/fsrs';
 import { actualizar, nuevo } from '../dominio/registro';
-import type { Aprendizaje } from '../dominio/tipos';
+import type { Aprendizaje, TemaReto } from '../dominio/tipos';
 import { fmtFechaLarga, plural } from '../lib/fmt';
 import { esc, urlSegura } from '../lib/html';
 import { cabecera } from './comun';
 
 /** Tema elegido a mano en el selector. Vale hasta que se juega un reto: después vuelve la rotación. */
-let temaElegido: { id: BloqueRetos['id']; el: string } | null = null;
+let temaElegido: { id: TemaReto; el: string } | null = null;
 
-function temaActual(ctx: Ctx): BloqueRetos['id'] {
-  const rotacion = temaSiguiente(ctx.datos.intentos);
-  if (temaElegido && ctx.datos.intentos.some((i) => i.creado > (temaElegido?.el ?? ''))) temaElegido = null;
+function temaActual(ctx: Ctx, jugables: readonly Reto[]): TemaReto {
+  const rotacion = temaSiguiente(ctx.datos.intentos, jugables);
+  const el = temaElegido?.el ?? '';
+  if (temaElegido && (ctx.datos.intentos.some((i) => i.creado > el) || !jugables.some((r) => r.bloque === temaElegido?.id))) temaElegido = null;
   return temaElegido?.id ?? rotacion;
 }
 
@@ -25,11 +26,13 @@ function renderRepaso(ctx: Ctx): string {
 }
 
 function renderReto(ctx: Ctx): string {
-  const tema = temaActual(ctx);
-  const reto = siguienteRetoPendiente(ctx.datos.intentos, tema);
+  const jugables = retosJugables(todosLosRetos(ctx.datos.retos));
+  const tema = temaActual(ctx, jugables);
+  const reto = siguienteRetoPendiente(ctx.datos.intentos, jugables, tema) ?? CATALOGO_RETOS[0];
   const bloque = BLOQUES_RETOS.find((b) => b.id === reto.bloque);
   const resumen = reto.escenario.length > 170 ? `${reto.escenario.slice(0, 170).trimEnd()}…` : reto.escenario;
-  const selector = BLOQUES_RETOS.map(
+  // Un tema sin ningún reto (la carrera por la AGI antes del primer generado) no se ofrece.
+  const selector = BLOQUES_RETOS.filter((b) => jugables.some((r) => r.bloque === b.id)).map(
     (b) =>
       `<button type="button" class="seg-btn" data-accion="tema" data-tema="${esc(b.id)}" aria-pressed="${b.id === tema}">${esc(b.corto)}</button>`,
   ).join('');
@@ -37,7 +40,7 @@ function renderReto(ctx: Ctx): string {
   return `
     <article class="act">
       <header><h2>Un reto</h2></header>
-      <p class="m-sub">${esc(bloque?.titulo ?? '')}</p>
+      <p class="m-sub">${esc(bloque?.titulo ?? '')}${reto.generado ? ' · generado por IA' : ''}</p>
       <p><b>${esc(reto.titulo)}</b></p>
       <p>${esc(resumen)}</p>
       <div class="seg tema" role="group" aria-label="Tema del reto">${selector}</div>
@@ -120,7 +123,8 @@ export const hoy: Vista = {
       const id = BLOQUES_RETOS.find((x) => x.id === b.dataset.tema)?.id;
       if (!id) return;
       // Pulsar el tema que ya toca por rotación vuelve a la rotación.
-      temaElegido = id === temaSiguiente(ctx.datos.intentos) ? null : { id, el: new Date().toISOString() };
+      const rotacion = temaSiguiente(ctx.datos.intentos, retosJugables(todosLosRetos(ctx.datos.retos)));
+      temaElegido = id === rotacion ? null : { id, el: new Date().toISOString() };
       ctx.pintar();
     });
 

@@ -88,8 +88,8 @@ export const NIVELES_CONFIANZA = [0.3, 0.6, 0.9] as const;
  * reintento ya conoces la solución. Los de debate no tienen acierto posible. El acierto es la jugada inicial
  * correcta, que es justo el estado «sin ayuda» (ver `estadoAutomatico`).
  */
-export function resueltasDeRetos(intentos: readonly Intento[]): Resuelta[] {
-  const vivos = intentosContables(intentos.filter((i) => !i.borrado && i.fuenteId === ID_FUENTE_RETOS))
+export function resueltasDeRetos(intentos: readonly Intento[], retos: readonly Reto[]): Resuelta[] {
+  const vivos = intentosContables(intentos.filter((i) => !i.borrado && i.fuenteId === ID_FUENTE_RETOS), retos)
     .sort((a, b) => a.creado.localeCompare(b.creado));
   const vistos = new Set<string>();
   const salida: Resuelta[] = [];
@@ -125,8 +125,8 @@ export interface CalibracionRetos {
   niveles: { confianza: number; n: number; aciertos: number }[];
 }
 
-export function calibracionRetos(intentos: readonly Intento[]): CalibracionRetos {
-  const rs = resueltasDeRetos(intentos);
+export function calibracionRetos(intentos: readonly Intento[], retos: readonly Reto[]): CalibracionRetos {
+  const rs = resueltasDeRetos(intentos, retos);
   const n = rs.length;
   const grupos = new Map<number, { n: number; aciertos: number }>();
   for (const r of rs) {

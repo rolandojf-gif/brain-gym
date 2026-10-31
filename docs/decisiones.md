@@ -52,5 +52,6 @@ La versión del sprint diario se sentía como una obligación. El objetivo pasa 
 - **Confianza en cada reto:** sí. Niveles 30/60/90 % (con cuatro opciones el azar da un 25 %; un mínimo del 60 % forzaría a declarar exceso de confianza al dudar). Obligatoria sólo en el primer intento de un reto con respuesta correcta. Progreso calcula Brier, sesgo y margen de ruido.
 - **Escribir antes de ver las opciones:** opcional. Sustituye al campo «¿Cuál es tu lógica?».
 - **Tema del siguiente reto:** rota a partir del último jugado, saltando temas sin retos por estrenar, con un selector en Hoy para cambiarlo.
-- **Retos generados por IA:** entran (Fase 2), con fuente verificada, revisor y botón «esto está mal». Temas nuevos: carrera por la AGI y psicología.
+- **Retos generados por IA:** entran (Fase 2), con fuente verificada, revisor y botón «esto está mal». Temas nuevos: carrera por la AGI (tema 5, sólo generados) y psicología (el tema 4 pasa a «Psicología, Sesgos y Modelos Mentales»).
+- **Mezcla de catálogo y generados:** alternar. En cada tema, uno del catálogo y uno generado mientras queden del catálogo; después, sólo generados.
 

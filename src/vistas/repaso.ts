@@ -1,7 +1,7 @@
 /* 04 · Repaso: cola de tarjetas vencidas con FSRS, pensada primero para el móvil. También alta y edición de
    tarjetas: #repaso/nueva[/<colección>/<id>] crea una desde otro módulo; #repaso/tarjetas las lista. */
 import { accion, campos, type Ctx, type Vista } from '../app';
-import { CATALOGO_RETOS } from '../dominio/catalogo-retos';
+import { nombreReto, todosLosRetos } from '../dominio/catalogo-retos';
 import { ETIQUETA_ESTADO } from '../dominio/estudio';
 import { nuevaTarjeta, previsualizar, repasar, vencidas } from '../dominio/fsrs';
 import { actualizar, borrar } from '../dominio/registro';
@@ -75,10 +75,10 @@ function borradorDesde(ctx: Ctx, coleccion: string, id: string): Partial<Tarjeta
   if (coleccion === 'intentos') {
     const i = ctx.datos.intentos.find((x) => x.id === id);
     if (i) {
-      const reto = CATALOGO_RETOS.find((r) => r.id === i.ejercicio);
+      const reto = todosLosRetos(ctx.datos.retos).find((r) => r.id === i.ejercicio);
       if (reto) {
         return {
-          anverso: `[Reto ${reto.id} · ${reto.titulo}]\n${reto.escenario}`,
+          anverso: `[${nombreReto(reto)}]\n${reto.escenario}`,
           reverso: `${reto.modeloMental}\n\nClave: ${reto.solucion}`,
           origen: { coleccion: 'intentos', id },
         };

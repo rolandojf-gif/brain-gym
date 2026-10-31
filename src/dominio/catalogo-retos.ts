@@ -1,20 +1,22 @@
-/* Catálogo integrado de retos estratégicos, incentivos, paradojas y modelos mentales.
-   Se mapea sobre las colecciones `fuentes` (1 fuente con 4 capítulos = bloques) e `intentos` (ejercicio = reto.id)
-   para mantener intacto el esquema v1 de IndexedDB y la sincronización. */
+/* Catálogo integrado de retos estratégicos, incentivos, paradojas y modelos mentales, y su unión con los retos
+   generados por IA (colección `retos`). Los intentos de unos y otros van a `intentos` con fuenteId = ID_FUENTE_RETOS,
+   capitulo = tema y ejercicio = id del reto (en los generados, su id de registro). */
 import { ultimosIntentos } from './estudio';
 import { nuevo } from './registro';
-import type { EstadoIntento, Fuente, Intento } from './tipos';
+import type { EstadoIntento, Fuente, Intento, LetraOpcion, RetoGenerado, TemaReto } from './tipos';
 
 export const ID_FUENTE_RETOS = 'catalogo-retos';
 
 export interface OpcionReto {
-  id: 'A' | 'B' | 'C' | 'D';
+  id: LetraOpcion;
   texto: string;
+  /** Por qué es buena o mala. Sólo la traen los retos generados; se enseña al resolver. */
+  porQue?: string;
 }
 
 export interface Reto {
   id: string;
-  bloque: '1' | '2' | '3' | '4';
+  bloque: TemaReto;
   titulo: string;
   /** Problema abierto (Newcomb…): se elige postura, no hay acierto ni fallo y no cuenta en las estadísticas. */
   debate?: boolean;
@@ -25,10 +27,12 @@ export interface Reto {
   pista: string;
   solucion: string;
   modeloMental: string;
+  /** Sólo en los retos generados por IA: de dónde sale, quién lo generó y lo revisó, y si se reportó como erróneo. */
+  generado?: { fuente: { titulo: string; url: string }; modelo: string; revision: string; reportado: boolean; notaReporte: string };
 }
 
 export interface BloqueRetos {
-  id: '1' | '2' | '3' | '4';
+  id: TemaReto;
   titulo: string;
   /** Nombre del tema en el selector de Hoy. */
   corto: string;
@@ -56,9 +60,15 @@ export const BLOQUES_RETOS: readonly BloqueRetos[] = [
   },
   {
     id: '4',
-    titulo: 'Sesgos y Modelos Mentales',
-    corto: 'Sesgos',
+    titulo: 'Psicología, Sesgos y Modelos Mentales',
+    corto: 'Psicología',
     descripcion: 'Datos ausentes, costes hundidos, pensamiento de segundo orden y sesgo de resultado.',
+  },
+  {
+    id: '5',
+    titulo: 'Carrera por la AGI',
+    corto: 'AGI',
+    descripcion: 'Laboratorios y Estados en carrera: seguridad frente a velocidad, pausas, compromisos verificables. Sólo retos generados.',
   },
 ];
 
@@ -663,7 +673,7 @@ export const CATALOGO_RETOS: readonly [Reto, ...Reto[]] = [
   },
 ];
 
-export function fuenteRetos(ahora: Date): Fuente {
+export function fuenteRetos(ahora: Date, retos: readonly Reto[] = CATALOGO_RETOS): Fuente {
   return nuevo(
     {
       titulo: 'Catálogo de Retos · Juegos, Incentivos, Paradojas y Sesgos',
@@ -672,7 +682,7 @@ export function fuenteRetos(ahora: Date): Fuente {
       capitulos: BLOQUES_RETOS.map((b) => ({
         id: b.id,
         titulo: b.titulo,
-        ejercicios: CATALOGO_RETOS.filter((r) => r.bloque === b.id && !r.debate).length,
+        ejercicios: retos.filter((r) => r.bloque === b.id && !r.debate).length,
       })),
     },
     ahora,
@@ -680,7 +690,41 @@ export function fuenteRetos(ahora: Date): Fuente {
   );
 }
 
-/** Estado del último intento registrado para un reto del catálogo, o `null` si aún no se ha intentado. */
+/** Un reto generado con la forma de los del catálogo, para que el ring, la revisión y las métricas no distingan. */
+export function retoDeGenerado(g: RetoGenerado): Reto {
+  return {
+    id: g.id,
+    bloque: g.tema,
+    titulo: g.titulo,
+    ...(g.opcionCorrecta === null ? { debate: true } : {}),
+    escenario: g.escenario,
+    opciones: g.opciones,
+    opcionCorrecta: g.opcionCorrecta,
+    pista: g.pista,
+    solucion: g.solucion,
+    modeloMental: g.modeloMental,
+    generado: { fuente: g.fuente, modelo: g.modelo, revision: g.revision, reportado: Boolean(g.reporte), notaReporte: g.reporte?.nota ?? '' },
+  };
+}
+
+/** Catálogo más generados vivos (también los reportados), los generados del más antiguo al más nuevo. Para buscar
+    un reto por id, el historial y la revisión. */
+export function todosLosRetos(generados: readonly RetoGenerado[]): Reto[] {
+  const vivos = generados.filter((g) => !g.borrado).sort((a, b) => a.creado.localeCompare(b.creado));
+  return [...CATALOGO_RETOS, ...vivos.map(retoDeGenerado)];
+}
+
+/** Los que se pueden ofrecer: fuera los reportados con «esto está mal». */
+export function retosJugables(retos: readonly Reto[]): Reto[] {
+  return retos.filter((r) => !r.generado?.reportado);
+}
+
+/** Nombre de un reto en listas y tarjetas: los del catálogo llevan su número; los generados, sólo el título. */
+export function nombreReto(reto: Reto): string {
+  return reto.generado ? reto.titulo : `Reto ${reto.id} · ${reto.titulo}`;
+}
+
+/** Estado del último intento registrado para un reto, o `null` si aún no se ha intentado. */
 export function estadoDeReto(retoId: string, intentos: readonly Intento[]): EstadoIntento | null {
   const ultimos = ultimosIntentos(intentos.filter((i) => i.fuenteId === ID_FUENTE_RETOS));
   return ultimos.find((i) => i.ejercicio === retoId)?.estado ?? null;
@@ -735,18 +779,19 @@ export function estadoAutomatico(reto: Reto, inicial: string, final: string, pis
   return pistaVista && final === reto.opcionCorrecta ? 'con_pista' : 'solucion';
 }
 
-/** Intentos que cuentan en las métricas: fuera los de retos de debate, que no tienen acierto posible. */
-export function intentosContables(intentos: readonly Intento[]): Intento[] {
-  const debate = new Set(CATALOGO_RETOS.filter((r) => r.debate).map((r) => r.id));
-  return intentos.filter((i) => !(i.fuenteId === ID_FUENTE_RETOS && debate.has(i.ejercicio)));
+/** Intentos que cuentan en las métricas: fuera los de retos de debate (sin acierto posible) y los de retos
+    generados que se reportaron como erróneos. */
+export function intentosContables(intentos: readonly Intento[], retos: readonly Reto[]): Intento[] {
+  const fuera = new Set(retos.filter((r) => r.debate || r.generado?.reportado).map((r) => r.id));
+  return intentos.filter((i) => !(i.fuenteId === ID_FUENTE_RETOS && fuera.has(i.ejercicio)));
 }
 
 /**
  * Reconstruye el detalle completo de un reto ya respondido (escenario, opción elegida por el usuario,
  * opción óptima, si acertó o cayó en la trampa, explicación y regla mental) para el Modo Revisión.
  */
-export function inspeccionarRetoCompletado(retoId: string, intentos: readonly Intento[]): InspeccionReto | null {
-  const reto = CATALOGO_RETOS.find((r) => r.id === retoId);
+export function inspeccionarRetoCompletado(retoId: string, intentos: readonly Intento[], retos: readonly Reto[]): InspeccionReto | null {
+  const reto = retos.find((r) => r.id === retoId);
   if (!reto) return null;
   const ultimos = ultimosIntentos(intentos.filter((i) => i.fuenteId === ID_FUENTE_RETOS));
   const intento = ultimos.find((i) => i.ejercicio === retoId);
@@ -769,24 +814,20 @@ export function inspeccionarRetoCompletado(retoId: string, intentos: readonly In
 }
 
 /**
- * Devuelve el siguiente reto pendiente del catálogo (opcionalmente filtrado por bloque):
- * 1. Primero busca el primer reto que nunca se haya intentado.
- * 2. Si todos se han intentado, devuelve el primero cuyo último intento fue `no_resuelto` o `solucion`.
- * 3. Si todos están superados (`sin_ayuda` o `con_pista`), devuelve el primero del filtro para poder rejugarlo.
- */
-/**
  * Tema del siguiente reto: rota en orden circular a partir del tema del último reto jugado y salta los temas sin
- * retos por estrenar. Sin historial, el primero; con todo jugado, rota sin saltar.
+ * retos por estrenar. Sin historial, el primero; con todo jugado, rota sin saltar entre los temas que tienen retos.
+ * `retos` son los jugables: el tema de la carrera por la AGI sólo entra cuando hay un reto generado.
  */
-export function temaSiguiente(intentos: readonly Intento[]): BloqueRetos['id'] {
+export function temaSiguiente(intentos: readonly Intento[], retos: readonly Reto[]): TemaReto {
   const vivos = intentos.filter((i) => !i.borrado && i.fuenteId === ID_FUENTE_RETOS);
   const jugados = new Set(vivos.map((i) => i.ejercicio));
   const orden = BLOQUES_RETOS.map((b) => b.id);
-  const conNuevos = orden.filter((b) => CATALOGO_RETOS.some((r) => r.bloque === b && !jugados.has(r.id)));
-  const candidatos = conNuevos.length > 0 ? conNuevos : orden;
+  const conRetos = orden.filter((b) => retos.some((r) => r.bloque === b));
+  const conNuevos = conRetos.filter((b) => retos.some((r) => r.bloque === b && !jugados.has(r.id)));
+  const candidatos = conNuevos.length > 0 ? conNuevos : conRetos;
   const ultimo = vivos.reduce<Intento | undefined>((a, i) => (!a || i.creado > a.creado ? i : a), undefined);
-  const bloqueUltimo = CATALOGO_RETOS.find((r) => r.id === ultimo?.ejercicio)?.bloque;
-  const inicio = bloqueUltimo ? orden.indexOf(bloqueUltimo) + 1 : 0;
+  const temaUltimo = orden.find((b) => b === ultimo?.capitulo);
+  const inicio = temaUltimo ? orden.indexOf(temaUltimo) + 1 : 0;
   for (let k = 0; k < orden.length; k++) {
     const b = orden[(inicio + k) % orden.length];
     if (b && candidatos.includes(b)) return b;
@@ -794,20 +835,55 @@ export function temaSiguiente(intentos: readonly Intento[]): BloqueRetos['id'] {
   return '1';
 }
 
-export function siguienteRetoPendiente(intentos: readonly Intento[], bloqueFiltro?: string): Reto {
-  const candidatos = bloqueFiltro && bloqueFiltro !== 'todos'
-    ? CATALOGO_RETOS.filter((r) => r.bloque === bloqueFiltro)
-    : CATALOGO_RETOS;
-  const lista = candidatos.length > 0 ? candidatos : CATALOGO_RETOS;
-  const ultimos = new Map<string, EstadoIntento>();
-  for (const i of ultimosIntentos(intentos.filter((x) => x.fuenteId === ID_FUENTE_RETOS))) {
-    ultimos.set(i.ejercicio, i.estado);
-  }
-  const sinIntentar = lista.find((r) => !ultimos.has(r.id));
-  if (sinIntentar) return sinIntentar;
+/**
+ * Siguiente reto de un tema (o de todos), entre los jugables:
+ * 1. Uno sin estrenar, alternando catálogo y generados: si el último reto jugado del tema era del catálogo, toca uno
+ *    generado, y al revés. Sin historial en el tema, el catálogo. Si no queda del tipo que toca, el otro.
+ *    Dentro de cada tipo, en orden: el catálogo como está escrito y los generados del más antiguo al más nuevo.
+ * 2. Si todo está jugado, el primero cuyo último intento fue `no_resuelto` o `solucion`.
+ * 3. Si no, el primero, para rejugarlo. `null` sólo si el tema no tiene ningún reto.
+ */
+export function siguienteRetoPendiente(intentos: readonly Intento[], retos: readonly Reto[], tema?: string): Reto | null {
+  const lista = tema && tema !== 'todos' ? retos.filter((r) => r.bloque === tema) : [...retos];
+  if (lista.length === 0) return null;
+  const ultimos = new Map<string, Intento>();
+  for (const i of ultimosIntentos(intentos.filter((x) => x.fuenteId === ID_FUENTE_RETOS))) ultimos.set(i.ejercicio, i);
+
+  const ultimoDelTema = lista
+    .map((r) => ultimos.get(r.id))
+    .reduce<Intento | undefined>((a, i) => (i && (!a || i.creado > a.creado) ? i : a), undefined);
+  const tocaGenerado = Boolean(ultimoDelTema && !lista.find((r) => r.id === ultimoDelTema.ejercicio)?.generado);
+  const sinJugar = lista.filter((r) => !ultimos.has(r.id));
+  const generado = sinJugar.find((r) => r.generado);
+  const delCatalogo = sinJugar.find((r) => !r.generado);
+  const nuevo = tocaGenerado ? (generado ?? delCatalogo) : (delCatalogo ?? generado);
+  if (nuevo) return nuevo;
+
   const porReforzar = lista.find((r) => {
-    const e = ultimos.get(r.id);
+    const e = ultimos.get(r.id)?.estado;
     return e === 'no_resuelto' || e === 'solucion';
   });
-  return porReforzar ?? lista[0] ?? CATALOGO_RETOS[0];
+  return porReforzar ?? lista[0] ?? null;
+}
+
+/** Retos generados listos (sin jugar ni reportar) que la app intenta tener en cada tema. */
+export const LISTOS_POR_TEMA = 1;
+
+/**
+ * Temas a los que les falta un reto generado listo. Primero los que no tienen ningún reto por estrenar (la carrera
+ * por la AGI al empezar, o un tema con el catálogo agotado), porque sin generado no hay nada nuevo que ofrecer.
+ * `retos`: todos (catálogo y generados), para que un reportado no cuente como listo.
+ */
+export function temasPorReponer(retos: readonly Reto[], intentos: readonly Intento[]): TemaReto[] {
+  const jugados = new Set(intentos.filter((i) => !i.borrado && i.fuenteId === ID_FUENTE_RETOS).map((i) => i.ejercicio));
+  const sinJugar = retosJugables(retos).filter((r) => !jugados.has(r.id));
+  const faltan = BLOQUES_RETOS.map((b) => b.id).filter((t) => sinJugar.filter((r) => r.generado && r.bloque === t).length < LISTOS_POR_TEMA);
+  const vacio = (t: TemaReto) => !sinJugar.some((r) => r.bloque === t);
+  return [...faltan.filter(vacio), ...faltan.filter((t) => !vacio(t))];
+}
+
+/** Títulos ya usados en un tema (catálogo y generados, también reportados), para pedir al generador que no repita
+    concepto. Los generados van al final, del más antiguo al más nuevo: si hay que recortar, se quedan los recientes. */
+export function vistosDeTema(tema: TemaReto, retos: readonly Reto[]): string[] {
+  return retos.filter((r) => r.bloque === tema).map((r) => r.titulo);
 }

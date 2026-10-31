@@ -1,9 +1,26 @@
 /* 06 · Datos: sincronización, exportar/importar y el corte del día. El plan semanal salió de la interfaz (Hoy es un
    menú, no una agenda); `ajustes.planSemanal` se conserva en los datos por compatibilidad. */
-import { accion, campos, type Vista } from '../app';
+import { accion, campos, type Ctx, type Vista } from '../app';
+import { ID_FUENTE_RETOS } from '../dominio/catalogo-retos';
+import { MAX_LLAMADAS_IA_DIA } from '../dominio/retos-ia';
 import { actualizar } from '../dominio/registro';
 import { esc } from '../lib/html';
 import { cabecera, descargar } from './comun';
+
+// Estado de los retos generados: si algo falla en el servidor (falta la clave, el tope del día), se ve aquí.
+function panelRetosIa(ctx: Ctx): string {
+  const vivos = ctx.datos.retos.filter((r) => !r.borrado);
+  const jugados = new Set(ctx.datos.intentos.filter((i) => !i.borrado && i.fuenteId === ID_FUENTE_RETOS).map((i) => i.ejercicio));
+  const listos = vivos.filter((r) => !r.reporte && !jugados.has(r.id)).length;
+  const reportados = vivos.filter((r) => r.reporte).length;
+  return `
+    <h2 class="sec">Retos generados</h2>
+    <div class="panel">
+      <p>${listos} sin jugar · ${vivos.length} generados en total${reportados ? ` · ${reportados} marcados como erróneos` : ''}.</p>
+      ${ctx.retosIa ? `<p class="estado-sync">${esc(ctx.retosIa)}</p>` : ''}
+      <p class="note">La app los pide sola, uno por tema, cuando tiene la clave de sincronización. Tope: ${MAX_LLAMADAS_IA_DIA} llamadas a la IA al día entre retos y Abogado del Diablo.</p>
+    </div>`;
+}
 
 export const datos: Vista = {
   titulo: 'Datos',
@@ -24,6 +41,8 @@ export const datos: Vista = {
           <div class="acciones"><button class="btn primario" data-accion="sincronizar"${ctx.sync.tieneToken ? '' : ' disabled'}>Sincronizar ahora</button>
           ${ctx.sync.tieneToken ? '<button class="btn sutil" data-accion="olvidar">Olvidar la clave en este dispositivo</button>' : ''}</div>
         </div>
+
+        ${panelRetosIa(ctx)}
 
         <h2 class="sec">Exportar e importar</h2>
         <div class="panel">
