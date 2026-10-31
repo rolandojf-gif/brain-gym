@@ -41,7 +41,7 @@ Colecciones:
 | --- | --- | --- |
 | `ajustes` | `planSemanal: Record<0..6, Actividad[]>`, `horaCorte` | Un solo registro. `Actividad = 'estudio' \| 'lectura' \| 'repaso' \| 'calibracion' \| 'concepto'`. Plan por defecto: L-X-V retos (`estudio`), M-J lectura 3x1, repaso y modelo mental a diario. |
 | `fuentes` | `titulo`, `tipo`, `url`, `capitulos: {id, titulo, ejercicios?: number}[]` | Catálogo integrado de retos (`catalogo-retos`, 4 bloques de 4 retos). |
-| `intentos` | `fuenteId`, `capitulo`, `ejercicio`, `estado`, `segundos`, `notaError`, `dia`, `tarjetaId?` | `estado = 'sin_ayuda' \| 'con_pista' \| 'solucion' \| 'no_resuelto'`. Un ejercicio puede tener varios intentos. |
+| `intentos` | `fuenteId`, `capitulo`, `ejercicio`, `estado`, `segundos`, `notaError`, `dia`, `tarjetaId?`, `confianza?` | `estado = 'sin_ayuda' \| 'con_pista' \| 'solucion' \| 'no_resuelto'`. Un ejercicio puede tener varios intentos. `confianza` (0,3 / 0,6 / 0,9) se declara al fijar la jugada en el primer intento de un reto con respuesta correcta; con el acierto inicial (estado `sin_ayuda`) da el Brier de Progreso. Campo opcional y aditivo: no sube el esquema. |
 | `lecturas` | `url`, `titulo`, `medio`, `tema`, `estado`, `leidaEl?` | `estado = 'pendiente' \| 'leida' \| 'escrita' \| 'descartada'`. No se guarda el texto del artículo. |
 | `escritos` | `lecturaId`, `resumen`, `objecion`, `palabras`, `enviadoEl` | Fase 2 añade `feedbackIa?` y `revision30?`. |
 | `tarjetas` | `tipo`, `anverso`, `reverso`, `origen?: {coleccion, id}`, `fsrs` | `tipo = 'basica'` (Fase 2: `'numerica'` con valor y unidad). `fsrs` es el estado de `ts-fsrs` serializado (fechas en ISO). |
@@ -55,6 +55,7 @@ Lo que se calcula y no se guarda: Brier, curva de calibración, progreso por cap
 ## Migraciones
 
 - `ESQUEMA_VERSION` es un entero que empieza en 1.
+- Sube con cada cambio incompatible: quitar o renombrar un campo, cambiar su significado o añadir una colección. Un campo opcional nuevo no la sube: los registros sin él siguen siendo válidos y una app anterior lo conserva al sincronizar, porque guarda el registro entero.
 - Una migración es una función pura `(datos v_n) → datos v_n+1` sobre la misma forma que la exportación JSON. Cada una lleva test con datos de ejemplo de la versión anterior.
 - Se aplican en dos sitios con el mismo código: al abrir la base de datos (si la versión guardada es menor) y al importar un JSON antiguo. Así una exportación de hoy se podrá importar dentro de un año.
 - Las migraciones de IndexedDB (`onupgradeneeded`) sólo crean o borran almacenes e índices; la transformación de datos la hacen las migraciones puras. Por eso no uso Dexie: su versionado sólo cubriría la mitad.

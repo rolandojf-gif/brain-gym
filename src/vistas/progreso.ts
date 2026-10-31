@@ -1,15 +1,55 @@
 /* 05 · Progreso: continuidad real (calendario de sesiones hechas), tasa de resolución de retos
    (sin ayuda vs con pista vs solución y desglose por los 4 bloques temáticos) y madurez del mazo FSRS + lecturas 3x1. */
 import type { Vista } from '../app';
+import { calibracionRetos, type CalibracionRetos } from '../dominio/calibracion';
 import { fuenteRetos, intentosContables } from '../dominio/catalogo-retos';
 import { desgloseResolucion, progresoPorCapitulo } from '../dominio/estudio';
 import { calendario, madurezMazo } from '../dominio/progreso';
 import type { Actividad } from '../dominio/tipos';
-import { fmtFecha, fmtPct, plural } from '../lib/fmt';
+import { fmtFecha, fmtNum, fmtPct, plural } from '../lib/fmt';
 import { esc } from '../lib/html';
 import { NOMBRE_ACTIVIDAD, cabecera } from './comun';
 
 const ORDEN: Actividad[] = ['estudio', 'lectura', 'repaso', 'concepto'];
+
+/** Por debajo, la aproximación normal del margen no vale y cualquier diferencia es ruido: sólo se muestran los datos. */
+const MINIMO_CALIBRACION = 10;
+
+// Calibración: si aciertas tanto como dices. El veredicto sólo aparece si el sesgo supera el ruido esperable.
+function panelCalibracion(c: CalibracionRetos): string {
+  if (c.n === 0 || c.confianzaMedia === null || c.tasaAcierto === null || c.sesgo === null || c.margen === null) {
+    return `<div class="panel"><p class="note">Aún sin datos. Cada reto nuevo te pide cuánto confías en tu jugada antes de ver la pista; aquí verás si aciertas tanto como dices.</p></div>`;
+  }
+  const declarada = fmtPct(c.confianzaMedia), real = fmtPct(c.tasaAcierto);
+  const ruido = `con ${plural(c.n, 'reto', 'retos')}, el azar explica hasta ±${Math.round(c.margen * 100)} puntos`;
+  const veredicto =
+    c.n < MINIMO_CALIBRACION
+      ? `Declaras de media ${declarada} y aciertas el ${real}. Con ${plural(c.n, 'reto', 'retos')} todavía es ruido: el veredicto aparece a partir de ${MINIMO_CALIBRACION}.`
+      : c.sesgo > c.margen
+      ? `<b>Te pasas de confiado:</b> declaras de media ${declarada} y aciertas el ${real} (${ruido}).`
+      : c.sesgo < -c.margen
+        ? `<b>Te quedas corto:</b> aciertas el ${real} y declaras de media ${declarada} (${ruido}).`
+        : `Declaras de media ${declarada} y aciertas el ${real}: <b>compatible con estar bien calibrado</b> (${ruido}).`;
+  const filas = c.niveles
+    .map((nv) => `<tr><th scope="row">${esc(fmtPct(nv.confianza))}</th><td class="num">${nv.n}</td><td class="num">${nv.aciertos} (${esc(fmtPct(nv.aciertos / nv.n))})</td></tr>`)
+    .join('');
+  const distingue = c.brier !== null && c.referencia !== null && c.brier < c.referencia;
+  const comparacion =
+    c.n < MINIMO_CALIBRACION
+      ? ''
+      : ` Decir siempre tu tasa de acierto daría ${esc(fmtNum(c.referencia, 2))}: ${distingue ? 'tu confianza distingue los retos que sabes de los que no.' : 'de momento tu confianza no distingue mejor que eso.'}`;
+  return `
+    <div class="panel">
+      <p>${veredicto}</p>
+      <div class="table-wrap">
+        <table class="plan">
+          <thead><tr><th>Dices</th><th>Retos</th><th>Aciertas</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+      <p class="note">Brier ${esc(fmtNum(c.brier, 2))} (0 es perfecto).${comparacion} Sólo cuenta el primer intento de cada reto.</p>
+    </div>`;
+}
 
 export const progreso: Vista = {
   titulo: 'Progreso',
@@ -31,6 +71,7 @@ export const progreso: Vista = {
     const contables = intentosContables(ctx.datos.intentos);
     const desglose = desgloseResolucion(contables);
     const porBloque = progresoPorCapitulo(fuente, contables);
+    const calibracion = calibracionRetos(ctx.datos.intentos);
     const mazo = madurezMazo(ctx.datos.tarjetas, ctx.datos.repasos);
     const escritos = ctx.datos.escritos.filter((e) => !e.borrado).length;
     const aprendizajes = ctx.datos.aprendizajes.filter((a) => !a.borrado).length;
@@ -70,6 +111,9 @@ export const progreso: Vista = {
             <span class="s">${plural(escritos, 'síntesis 3x1 escrita', 'síntesis 3x1 escritas')} · ${plural(aprendizajes, 'modelo mental diario', 'modelos mentales diarios')}</span>
           </div>
         </div>
+
+        <h2 class="sec">Calibración en retos</h2>
+        ${panelCalibracion(calibracion)}
 
         <h2 class="sec">Desglose por bloques temáticos</h2>
         <div class="panel">
