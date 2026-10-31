@@ -1,11 +1,12 @@
-# Brain Gym: Vite compila a dist/. Las funciones (sincronización y, en Fase 2, IA) irán en netlify/functions.
+# Brain Gym: Vite compila a dist/. Las funciones (sincronización e IA) están en netlify/functions.
 [build]
   command = "npm run build"
   publish = "dist"
 
 [build.environment]
   NODE_VERSION = "22"
-  # OPENROUTER_MODEL contiene el identificador público del modelo (ej. anthropic/claude-3.5-sonnet), no un secreto.
+  # OPENROUTER_MODEL y OPENROUTER_MODEL_REVISOR son identificadores públicos de modelo, no secretos. Son opcionales:
+  # sin ellos se usa MODELO_IA_POR_DEFECTO (src/dominio/ia.ts). Un identificador retirado da 404 en OpenRouter.
   SECRETS_SCAN_OMIT_KEYS = "OPENROUTER_MODEL,OPENROUTER_MODEL_REVISOR"
 
 [[headers]]
