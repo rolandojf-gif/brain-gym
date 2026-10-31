@@ -1,20 +1,13 @@
-/* 06 · Datos: sincronización, exportar/importar y ajustes (plan semanal y corte del día). */
+/* 06 · Datos: sincronización, exportar/importar y el corte del día. El plan semanal salió de la interfaz (Hoy es un
+   menú, no una agenda); `ajustes.planSemanal` se conserva en los datos por compatibilidad. */
 import { accion, campos, type Vista } from '../app';
 import { actualizar } from '../dominio/registro';
-import type { Actividad, PlanSemanal } from '../dominio/tipos';
 import { esc } from '../lib/html';
-import { NOMBRE_ACTIVIDAD, cabecera, descargar } from './comun';
-
-const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-const ACTIVIDADES: Actividad[] = ['estudio', 'lectura', 'repaso', 'concepto'];
+import { cabecera, descargar } from './comun';
 
 export const datos: Vista = {
   titulo: 'Datos',
   render(ctx) {
-    const plan = ctx.ajustes.planSemanal;
-    const filas = DIAS.map((d, i) => `
-      <tr><th scope="row">${d}</th>${ACTIVIDADES.map((a) => `
-        <td><input type="checkbox" name="plan-${i}-${a}" aria-label="${esc(`${d}: ${NOMBRE_ACTIVIDAD[a]}`)}"${plan[i as keyof PlanSemanal]?.includes(a) ? ' checked' : ''}></td>`).join('')}</tr>`).join('');
     const total = (Object.values(ctx.datos) as { borrado: boolean }[][]).reduce((n, l) => n + l.filter((r) => !r.borrado).length, 0);
     return `
       <section class="view">
@@ -48,11 +41,11 @@ export const datos: Vista = {
           </form>
         </div>
 
-        <h2 class="sec">Plan semanal</h2>
-        <form class="panel" data-accion="plan">
-          <div class="table-wrap"><table class="plan"><thead><tr><th></th>${ACTIVIDADES.map((a) => `<th scope="col">${esc(NOMBRE_ACTIVIDAD[a])}</th>`).join('')}</tr></thead><tbody>${filas}</tbody></table></div>
+        <h2 class="sec">Cuándo empieza el día</h2>
+        <form class="panel" data-accion="corte">
+          <p class="note">Lo que hagas de madrugada, antes de esta hora, cuenta para el día anterior.</p>
           <label class="campo corto">El día termina a las <input name="corte" type="number" min="0" max="12" value="${ctx.ajustes.horaCorte}"> h</label>
-          <button class="btn primario">Guardar el plan</button>
+          <button class="btn primario">Guardar</button>
         </form>
       </section>`;
   },
@@ -92,13 +85,11 @@ export const datos: Vista = {
         ctx.avisar(err instanceof Error ? err.message : 'No se pudo importar el archivo.', 'error');
       }
     });
-    accion(raiz, 'submit', 'plan', async (form, e) => {
+    accion(raiz, 'submit', 'corte', async (form, e) => {
       e.preventDefault();
-      const f = form as HTMLFormElement;
-      const plan = Object.fromEntries(DIAS.map((_, i) => [i, ACTIVIDADES.filter((a) => (f.elements.namedItem(`plan-${i}-${a}`) as HTMLInputElement).checked)])) as unknown as PlanSemanal;
-      const corte = Math.min(12, Math.max(0, Number(campos(f).corte) || 0));
-      await ctx.guardar({ coleccion: 'ajustes', registro: actualizar(ctx.ajustes, { planSemanal: plan, horaCorte: corte }, new Date()) });
-      ctx.avisar('Plan guardado.');
+      const corte = Math.min(12, Math.max(0, Number(campos(form as HTMLFormElement).corte) || 0));
+      await ctx.guardar({ coleccion: 'ajustes', registro: actualizar(ctx.ajustes, { horaCorte: corte }, new Date()) });
+      ctx.avisar('Guardado.');
     });
   },
 };

@@ -39,7 +39,7 @@ Colecciones:
 
 | Colección | Campos propios | Notas |
 | --- | --- | --- |
-| `ajustes` | `planSemanal: Record<0..6, Actividad[]>`, `horaCorte` | Un solo registro. `Actividad = 'estudio' \| 'lectura' \| 'repaso' \| 'calibracion' \| 'concepto'`. Plan por defecto: L-X-V retos (`estudio`), M-J lectura 3x1, repaso y modelo mental a diario. |
+| `ajustes` | `planSemanal: Record<0..6, Actividad[]>`, `horaCorte` | Un solo registro. `Actividad = 'estudio' \| 'lectura' \| 'repaso' \| 'calibracion' \| 'concepto'`. `planSemanal` no se usa en la interfaz desde el 31 oct 2026 (Hoy es un menú); se conserva por compatibilidad. |
 | `fuentes` | `titulo`, `tipo`, `url`, `capitulos: {id, titulo, ejercicios?: number}[]` | Catálogo integrado de retos (`catalogo-retos`, 4 bloques de 4 retos). |
 | `intentos` | `fuenteId`, `capitulo`, `ejercicio`, `estado`, `segundos`, `notaError`, `dia`, `tarjetaId?`, `confianza?` | `estado = 'sin_ayuda' \| 'con_pista' \| 'solucion' \| 'no_resuelto'`. Un ejercicio puede tener varios intentos. `confianza` (0,3 / 0,6 / 0,9) se declara al fijar la jugada en el primer intento de un reto con respuesta correcta; con el acierto inicial (estado `sin_ayuda`) da el Brier de Progreso. Campo opcional y aditivo: no sube el esquema. |
 | `lecturas` | `url`, `titulo`, `medio`, `tema`, `estado`, `leidaEl?` | `estado = 'pendiente' \| 'leida' \| 'escrita' \| 'descartada'`. No se guarda el texto del artículo. |
@@ -47,10 +47,10 @@ Colecciones:
 | `tarjetas` | `tipo`, `anverso`, `reverso`, `origen?: {coleccion, id}`, `fsrs` | `tipo = 'basica'` (Fase 2: `'numerica'` con valor y unidad). `fsrs` es el estado de `ts-fsrs` serializado (fechas en ISO). |
 | `repasos` | `tarjetaId`, `nota`, `repasadoEl`, `estadoPrevio` | Registro inmutable de cada repaso (el `ReviewLog` de FSRS). Nunca se edita. |
 | `predicciones` | `enunciado`, `probabilidad` (0–1), `venceEl`, `categoria`, `resolucion?: {resultado, resueltaEl}` | `resultado = 'si' \| 'no' \| 'anulada'`. Las anuladas no entran en el Brier. |
-| `sesiones` | `dia`, `actividad`, `inicio`, `fin?`, `segundos` | Una por actividad hecha. Alimenta el calendario de continuidad. |
+| `sesiones` | `dia`, `actividad`, `inicio`, `fin?`, `segundos` | Una por actividad hecha, con el tiempo dedicado. Ya no la muestra ninguna vista (salió el calendario), pero se sigue guardando y exportando. |
 | `aprendizajes` | `dia`, `texto`, `fuenteUrl?`, `tarjetaId?` | «Qué aprendí hoy». |
 
-Lo que se calcula y no se guarda: Brier, curva de calibración, progreso por capítulo, calendario y la sesión del día.
+Lo que se calcula y no se guarda: Brier y calibración (de predicciones y de retos), progreso por capítulo y el tema que toca en la rotación de retos.
 
 ## Migraciones
 

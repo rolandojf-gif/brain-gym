@@ -14,6 +14,7 @@ import {
   letraVisible,
   opcionesVisibles,
   siguienteRetoPendiente,
+  temaSiguiente,
   type InspeccionReto,
   type Reto,
 } from '../dominio/catalogo-retos';
@@ -79,7 +80,13 @@ function retoActivo(ctx: Ctx): Reto {
       return enCurso;
     }
   }
-  return siguienteRetoPendiente(ctx.datos.intentos, filtroBloque);
+  return siguienteReto(ctx);
+}
+
+/** Con «Todos los bloques», el siguiente reto sigue la misma rotación de temas que Hoy. */
+function siguienteReto(ctx: Ctx): Reto {
+  const intentos = ctx.datos.intentos;
+  return siguienteRetoPendiente(intentos, filtroBloque === 'todos' ? temaSiguiente(intentos) : filtroBloque);
 }
 
 function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoIntento | null, pedirConfianza: boolean): string {
@@ -385,7 +392,7 @@ export const estudio: Vista = {
   montar(ctx, raiz) {
     accion(raiz, 'click', 'filtrar-bloque', (b) => {
       filtroBloque = b.dataset.bloque ?? 'todos';
-      const sig = siguienteRetoPendiente(ctx.datos.intentos, filtroBloque);
+      const sig = siguienteReto(ctx);
       estadoActual = estadoNuevo(sig.id);
       if (ctx.sub) ctx.ir('#estudio');
       else ctx.pintar();
@@ -536,7 +543,7 @@ export const estudio: Vista = {
 
       await ctx.registrar('estudio', segundos);
 
-      const siguiente = siguienteRetoPendiente(ctx.datos.intentos, filtroBloque);
+      const siguiente = siguienteReto(ctx);
       estadoActual = estadoNuevo(siguiente.id);
 
       ctx.avisar(

@@ -1,7 +1,7 @@
 {
-  "name": "BRAIN.GYM · Rutina de entrenamiento cognitivo",
+  "name": "BRAIN.GYM · Juegos, incentivos, paradojas y sesgos",
   "short_name": "Brain Gym",
-  "description": "Qué toca hoy, hacerlo y dejarlo registrado.",
+  "description": "Un reto, una lectura o una idea: lo que te apetezca.",
   "lang": "es",
   "start_url": "/#hoy",
   "scope": "/",

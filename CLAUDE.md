@@ -1,12 +1,12 @@
 # BRAIN.GYM
 
-Web personal de un solo usuario para sostener un entrenamiento cognitivo ágil, diario y de baja fricción centrado en **Teoría de Juegos, Diseño de Incentivos, Paradojas de Decisión y Modelos Mentales**, apoyado en **Extracción Quirúrgica de Lecturas (3x1)** y **Repetición Espaciada (FSRS)**. El brief completo está en `docs/brief.md`; las decisiones, en `docs/decisiones.md`; la arquitectura y el modelo de datos, en `docs/arquitectura.md`. Léelos antes de cambiar algo de fondo.
+Web personal de un solo usuario para aprender por curiosidad sobre **Teoría de Juegos, Incentivos Perversos, Paradojas de Decisión y Sesgos/Modelos Mentales** (y, con los retos de IA, la carrera por la AGI y la psicología), apoyada en **Extracción Quirúrgica de Lecturas (3x1)** y **Repetición Espaciada (FSRS)**. No es una rutina que cumplir: lo que atrae está en el contenido. El brief completo está en `docs/brief.md`; las decisiones, en `docs/decisiones.md`; la arquitectura y el modelo de datos, en `docs/arquitectura.md`. Léelos antes de cambiar algo de fondo.
 
 ## Principios (no negociables)
 
-1. La herramienta sirve a la rutina (Sprint Diario de 10 min). Recorrido mínimo: abrir → ver el sprint de hoy → ejecutarlo → cerrar. Si algo añade fricción, sobra.
-2. Sin gamificación: ni puntos, ni insignias, ni rachas como premio, ni notificaciones insistentes. La continuidad se muestra como dato. Sólo métricas que midan algo real.
-3. Primero piensa el usuario, luego la resolución. En el ring de retos el usuario compromete su jugada antes de desbloquear la pista o ver el equilibrio/trampa.
+1. La herramienta sirve a la curiosidad, no a una rutina. Recorrido mínimo: abrir → elegir algo → hacerlo → cerrar. Nada se marca como pendiente ni como deber. Si algo añade fricción, sobra.
+2. Sin gamificación: ni puntos, ni insignias, ni rachas, ni calendarios de continuidad, ni notificaciones insistentes. Sólo métricas que midan algo real (retención FSRS, calibración).
+3. Primero piensa el usuario, luego la resolución. En el ring de retos escribe (si quiere) qué haría antes de ver las opciones y compromete su jugada y su confianza antes de desbloquear la pista o ver el equilibrio/trampa.
 4. No almacenar contenido externo innecesario: en lecturas sólo se guarda URL, metadatos y la extracción 3x1 propia.
 5. Simplicidad: un usuario, cada dependencia justificada por una necesidad concreta.
 6. Los datos son del usuario: exportación e importación completas siempre funcionando y retrocompatibles.
@@ -14,12 +14,12 @@ Web personal de un solo usuario para sostener un entrenamiento cognitivo ágil, 
 
 ## Navegación (6 pestañas)
 
-- `01 Hoy` (`#hoy`): Sprint Diario (10 min) en 3 bloques (1º Calentamiento FSRS, 2º Reto del Día o Lectura 3x1, 3º Cierre rápido de modelo mental).
-- `02 Retos` (`#estudio`): Ring de sparring interactivo con el catálogo integrado de 16 retos en 4 bloques temáticos y acordeón de 3 pasos.
+- `01 Hoy` (`#hoy`): menú de tres tarjetas (un reto con tema rotativo y selector, una lectura, una idea convertible en tarjeta) y una línea discreta si hay tarjetas vencidas.
+- `02 Retos` (`#estudio`): Ring de sparring con el catálogo integrado de 32 retos en 4 bloques temáticos y acordeón de 3 pasos. El estado lo deduce la app; los retos de debate no cuentan en las estadísticas.
 - `03 Lectura` (`#lectura`): Extracción Quirúrgica 3x1 (Tesis central, Mecanismo/Incentivo, Punto ciego/Objeción; máx. ~40 palabras por campo).
 - `04 Repaso` (`#repaso`): Mazo FSRS (`ts-fsrs`) alimentado desde los retos fallados, lecturas y aprendizajes diarios.
-- `05 Progreso` (`#progreso`): Continuidad real (12 semanas), tasa de resolución de retos por bloque (`sin_ayuda`, `con_pista`, `solucion`), madurez FSRS y síntesis 3x1.
-- `06 Datos` (`#datos`): Sincronización entre dispositivos, exportación/importación JSON y plan semanal.
+- `05 Progreso` (`#progreso`): retos jugados por tema, tarjetas aprendidas y retención, lecturas e ideas, y calibración en retos (Brier, sesgo y margen de ruido). Sin calendario ni tasas de acierto.
+- `06 Datos` (`#datos`): Sincronización entre dispositivos, exportación/importación JSON y hora de corte del día.
 
 ## Stack
 
@@ -46,9 +46,9 @@ Variable de entorno en Netlify: `BG_TOKEN` (mínimo 32 caracteres; generar con `
 - Funciones de Netlify en `netlify/functions/*.mts`; sus tests en `netlify/*.test.ts`, **nunca** dentro de `netlify/functions` (Netlify publicaría cualquier archivo de esa carpeta como función). La lógica va en `src/dominio` para probarla sin Netlify.
 - Tests de IndexedDB con `fake-indexeddb`.
 - PWA: `public/manifest.webmanifest` y `public/sw.js` (escrito a mano, sin dependencias). Si cambia la lista de archivos base o la estrategia del service worker, subir `CACHE` (`bg-vN`). El service worker sólo se registra en producción.
-- Lógica de dominio con tests obligatorios: FSRS, catálogo de retos, estudio, sesión del día, migraciones, fusión de sincronización.
+- Lógica de dominio con tests obligatorios: FSRS, catálogo de retos (incluida la rotación de temas), estudio, calibración, migraciones, fusión de sincronización.
 - Nombres de dominio en español (`sesionDeHoy`, `intentos`, `CATALOGO_RETOS`); el código de librerías externas, como venga.
-- Modelo de datos versionado: se conserva el almacén `predicciones` por retrocompatibilidad con exportaciones y sincronizaciones existentes aunque el módulo de calibración no esté en la interfaz activa.
+- Modelo de datos versionado: se conservan el almacén `predicciones`, la colección `sesiones` y `ajustes.planSemanal` por retrocompatibilidad con exportaciones y sincronizaciones existentes aunque ya no estén en la interfaz. Un campo opcional nuevo no sube el esquema; un cambio incompatible o una colección nueva, sí (ver `docs/arquitectura.md`).
 - Fechas en ISO 8601. El «día» de la rutina es el día lógico de `src/lib/dia.ts` (corte a las 04:00).
 - Comentarios en español, breves, que expliquen el porqué.
 

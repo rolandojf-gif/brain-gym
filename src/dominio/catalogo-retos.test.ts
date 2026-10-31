@@ -11,6 +11,7 @@ import {
   letraVisible,
   opcionesVisibles,
   siguienteRetoPendiente,
+  temaSiguiente,
   type Reto,
 } from './catalogo-retos';
 import { nuevo } from './registro';
@@ -194,5 +195,35 @@ describe('catalogo-retos', () => {
     const insp = inspeccionarRetoCompletado('1.2', [i]);
     expect(insp?.opcionElegida).toBe('D');
     expect(insp?.logica).toBe('castigar al que no coopera · y vigilar');
+  });
+});
+
+describe('rotación de temas', () => {
+  const todosDe = (bloque: string, min = 0) =>
+    CATALOGO_RETOS.filter((r) => r.bloque === bloque).map((r, k) => intento(r.id, 'sin_ayuda', min + k));
+
+  it('sin historial empieza por el primer tema', () => {
+    expect(temaSiguiente([])).toBe('1');
+  });
+
+  it('toca el tema siguiente al del último reto jugado, en círculo', () => {
+    expect(temaSiguiente([intento('1.1', 'sin_ayuda', 0)])).toBe('2');
+    expect(temaSiguiente([intento('1.1', 'sin_ayuda', 5), intento('2.1', 'solucion', 0)])).toBe('2');
+    expect(temaSiguiente([intento('4.1', 'solucion', 0)])).toBe('1');
+  });
+
+  it('salta los temas sin retos por estrenar e ignora los borrados', () => {
+    const bloque2 = todosDe('2');
+    expect(temaSiguiente([...bloque2, intento('1.1', 'sin_ayuda', 100)])).toBe('3');
+    expect(temaSiguiente([{ ...intento('1.1', 'sin_ayuda', 0), borrado: true }])).toBe('1');
+  });
+
+  it('con todo jugado rota sin saltar', () => {
+    const todo = BLOQUES_RETOS.flatMap((b, i) => todosDe(b.id, i * 10));
+    expect(temaSiguiente([...todo, intento('3.1', 'solucion', 500)])).toBe('4');
+  });
+
+  it('cada tema tiene nombre corto para el selector', () => {
+    expect(BLOQUES_RETOS.every((b) => b.corto.length > 0 && b.corto.length <= 20)).toBe(true);
   });
 });

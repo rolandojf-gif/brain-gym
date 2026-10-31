@@ -36,7 +36,18 @@ Fuera de la Fase 1 según el brief. Propuesta: en Fase 1, sólo registro propio 
 ## Otras decisiones · decididas (24 oct 2026)
 
 1. **Sin importadores externos en Fase 1.** Se empieza limpio en IndexedDB con exportación/importación JSON propia.
-2. **Catálogo integrado de Retos:** 16 retos autocontenidos distribuidos en 4 bloques temáticos (Teoría de Juegos, Incentivos y Sistemas, Paradojas de Decisión y Sesgos/Modelos Mentales), mapeados sobre `fuentes` e `intentos`.
+2. **Catálogo integrado de Retos:** 32 retos autocontenidos distribuidos en 4 bloques temáticos (Teoría de Juegos, Incentivos y Sistemas, Paradojas de Decisión y Sesgos/Modelos Mentales), mapeados sobre `fuentes` e `intentos`.
 3. **Corte del día a las 04:00** hora local, configurable (`src/lib/dia.ts`).
 4. **Las sesiones no hechas no se arrastran**; los repasos y las predicciones vencidas sí se acumulan.
 5. **«Escribir sin mirar» es un compromiso del usuario**: la app oculta el enlace, no puede impedir abrir otra pestaña.
+
+## D6. De rutina a curiosidad · decidida (31 oct 2026)
+
+La versión del sprint diario se sentía como una obligación. El objetivo pasa de sostener una rutina a ser un sitio al que se vuelve por curiosidad. Plan completo en el Claude Doc «Plan Brain Gym: curiosidad».
+
+- **Hoy es un menú, no una agenda:** un reto, una lectura y una idea; repaso como línea discreta. Fuera el plan semanal, el «Sprint diario» y el calendario de continuidad. `ajustes.planSemanal` y la colección `sesiones` se conservan en los datos por compatibilidad.
+- **Confianza en cada reto:** sí. Niveles 30/60/90 % (con cuatro opciones el azar da un 25 %; un mínimo del 60 % forzaría a declarar exceso de confianza al dudar). Obligatoria sólo en el primer intento de un reto con respuesta correcta. Progreso calcula Brier, sesgo y margen de ruido.
+- **Escribir antes de ver las opciones:** opcional. Sustituye al campo «¿Cuál es tu lógica?».
+- **Tema del siguiente reto:** rota a partir del último jugado, saltando temas sin retos por estrenar, con un selector en Hoy para cambiarlo.
+- **Retos generados por IA:** entran (Fase 2), con fuente verificada, revisor y botón «esto está mal». Temas nuevos: carrera por la AGI y psicología.
+

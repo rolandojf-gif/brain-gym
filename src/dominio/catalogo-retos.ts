@@ -30,6 +30,8 @@ export interface Reto {
 export interface BloqueRetos {
   id: '1' | '2' | '3' | '4';
   titulo: string;
+  /** Nombre del tema en el selector de Hoy. */
+  corto: string;
   descripcion: string;
 }
 
@@ -37,21 +39,25 @@ export const BLOQUES_RETOS: readonly BloqueRetos[] = [
   {
     id: '1',
     titulo: 'Teoría de Juegos y Estrategia',
+    corto: 'Teoría de juegos',
     descripcion: 'Dilemas estratégicos, equilibrios ocultos, nivel-K y asimetrías de compromiso.',
   },
   {
     id: '2',
     titulo: 'Incentivos Perversos y Sistemas',
+    corto: 'Incentivos',
     descripcion: 'Ley de Goodhart, efecto Cobra, cuellos de botella en redes y selección adversa.',
   },
   {
     id: '3',
     titulo: 'Paradojas de Decisión y Lógica',
+    corto: 'Paradojas',
     descripcion: 'Consensos falsos, rebotes de eficiencia, equilibrios extremos y precompromiso.',
   },
   {
     id: '4',
     titulo: 'Sesgos y Modelos Mentales',
+    corto: 'Sesgos',
     descripcion: 'Datos ausentes, costes hundidos, pensamiento de segundo orden y sesgo de resultado.',
   },
 ];
@@ -768,6 +774,26 @@ export function inspeccionarRetoCompletado(retoId: string, intentos: readonly In
  * 2. Si todos se han intentado, devuelve el primero cuyo último intento fue `no_resuelto` o `solucion`.
  * 3. Si todos están superados (`sin_ayuda` o `con_pista`), devuelve el primero del filtro para poder rejugarlo.
  */
+/**
+ * Tema del siguiente reto: rota en orden circular a partir del tema del último reto jugado y salta los temas sin
+ * retos por estrenar. Sin historial, el primero; con todo jugado, rota sin saltar.
+ */
+export function temaSiguiente(intentos: readonly Intento[]): BloqueRetos['id'] {
+  const vivos = intentos.filter((i) => !i.borrado && i.fuenteId === ID_FUENTE_RETOS);
+  const jugados = new Set(vivos.map((i) => i.ejercicio));
+  const orden = BLOQUES_RETOS.map((b) => b.id);
+  const conNuevos = orden.filter((b) => CATALOGO_RETOS.some((r) => r.bloque === b && !jugados.has(r.id)));
+  const candidatos = conNuevos.length > 0 ? conNuevos : orden;
+  const ultimo = vivos.reduce<Intento | undefined>((a, i) => (!a || i.creado > a.creado ? i : a), undefined);
+  const bloqueUltimo = CATALOGO_RETOS.find((r) => r.id === ultimo?.ejercicio)?.bloque;
+  const inicio = bloqueUltimo ? orden.indexOf(bloqueUltimo) + 1 : 0;
+  for (let k = 0; k < orden.length; k++) {
+    const b = orden[(inicio + k) % orden.length];
+    if (b && candidatos.includes(b)) return b;
+  }
+  return '1';
+}
+
 export function siguienteRetoPendiente(intentos: readonly Intento[], bloqueFiltro?: string): Reto {
   const candidatos = bloqueFiltro && bloqueFiltro !== 'todos'
     ? CATALOGO_RETOS.filter((r) => r.bloque === bloqueFiltro)

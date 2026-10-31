@@ -1,11 +1,5 @@
-/* Calendario de continuidad y métricas de madurez del mazo FSRS. Datos reales, sin gamificación. */
-import { sumarDias } from './sesion';
-import type { Actividad, Repaso, Sesion, Tarjeta } from './tipos';
-
-export interface DiaCalendario {
-  dia: string;
-  actividades: Actividad[];
-}
+/* Madurez del mazo FSRS: datos reales, sin gamificación. */
+import type { Repaso, Tarjeta } from './tipos';
 
 export interface MadurezMazo {
   totalTarjetas: number;
@@ -14,23 +8,6 @@ export interface MadurezMazo {
   totalRepasos: number;
   /** Proporción de repasos superados (nota >= 2) sobre el total de repasos. */
   retencion: number | null;
-}
-
-/** Las `semanas` semanas completas (lunes a domingo) que terminan en la semana de `hoy`. */
-export function calendario(sesiones: readonly Sesion[], hoy: string, semanas = 12): DiaCalendario[] {
-  const porDia = new Map<string, Set<Actividad>>();
-  for (const s of sesiones) {
-    if (s.borrado) continue;
-    let set = porDia.get(s.dia);
-    if (!set) porDia.set(s.dia, (set = new Set()));
-    set.add(s.actividad);
-  }
-  const diaSemana = (new Date(`${hoy}T12:00:00Z`).getUTCDay() + 6) % 7;
-  const inicio = sumarDias(hoy, -diaSemana - 7 * (semanas - 1));
-  return Array.from({ length: semanas * 7 }, (_, i) => {
-    const dia = sumarDias(inicio, i);
-    return { dia, actividades: [...(porDia.get(dia) ?? [])] };
-  });
 }
 
 /** Calcula la madurez del mazo FSRS y la tasa de retención real en los repasos. */
