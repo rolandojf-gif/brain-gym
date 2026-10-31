@@ -1,8 +1,8 @@
-/* Modelo de datos v1 (ver docs/arquitectura.md). Un cambio incompatible (quitar o renombrar un campo, cambiar su
+/* Modelo de datos v2 (ver docs/arquitectura.md). Un cambio incompatible (quitar o renombrar un campo, cambiar su
    significado o añadir una colección) exige subir ESQUEMA_VERSION y añadir una migración en migraciones.ts. Un campo
    opcional nuevo no: los registros sin él siguen siendo válidos y una app anterior lo conserva al sincronizar. */
 
-export const ESQUEMA_VERSION = 1;
+export const ESQUEMA_VERSION = 2;
 
 /** Campos comunes: identidad estable entre dispositivos, fusión «gana el último» y borrado lógico. */
 export interface Base {
@@ -136,6 +136,32 @@ export interface Aprendizaje extends Base {
   tarjetaId?: string;
 }
 
+/** Tema de un reto: los bloques 1–4 del catálogo y la carrera por la AGI (5), que sólo tiene retos generados. */
+export type TemaReto = '1' | '2' | '3' | '4' | '5';
+
+export type LetraOpcion = 'A' | 'B' | 'C' | 'D';
+
+/** Reto generado por IA (v2). Se juega igual que uno del catálogo: sus intentos van a `intentos` con `ejercicio = id`.
+    Se guarda entero porque es contenido propio de la app, no externo. */
+export interface RetoGenerado extends Base {
+  tema: TemaReto;
+  titulo: string;
+  escenario: string;
+  /** `porQue`: por qué la opción es buena o mala; se enseña al resolver. */
+  opciones: { id: LetraOpcion; texto: string; porQue: string }[];
+  /** `null` en los retos de debate (problemas abiertos sin respuesta correcta). */
+  opcionCorrecta: LetraOpcion | null;
+  pista: string;
+  solucion: string;
+  modeloMental: string;
+  fuente: { titulo: string; url: string };
+  /** Modelo de IA que lo generó y veredicto del revisor, para poder auditarlo. */
+  modelo: string;
+  revision: string;
+  /** «Esto está mal»: el reto sale de las estadísticas y queda marcado con la nota del usuario. */
+  reporte?: { nota: string; el: string };
+}
+
 export interface Colecciones {
   ajustes: Ajustes[];
   fuentes: Fuente[];
@@ -147,13 +173,26 @@ export interface Colecciones {
   predicciones: Prediccion[];
   sesiones: Sesion[];
   aprendizajes: Aprendizaje[];
+  retos: RetoGenerado[];
 }
 
 export type Coleccion = keyof Colecciones;
 
 export const COLECCIONES: readonly Coleccion[] = [
-  'ajustes', 'fuentes', 'intentos', 'lecturas', 'escritos', 'tarjetas', 'repasos', 'predicciones', 'sesiones', 'aprendizajes',
+  'ajustes', 'fuentes', 'intentos', 'lecturas', 'escritos', 'tarjetas', 'repasos', 'predicciones', 'sesiones', 'aprendizajes', 'retos',
 ];
+
+/** Colecciones que conoce cada versión del esquema. El servidor sólo envía a un dispositivo las de su versión: una app
+    anterior que recibiera una colección sin tienda en IndexedDB fallaría al sincronizar. */
+const COLECCIONES_POR_ESQUEMA: Readonly<Record<number, readonly Coleccion[]>> = {
+  1: COLECCIONES.filter((c) => c !== 'retos'),
+  2: COLECCIONES,
+};
+
+export function coleccionesDeEsquema(esquema: number): readonly Coleccion[] {
+  if (esquema >= ESQUEMA_VERSION) return COLECCIONES;
+  return COLECCIONES_POR_ESQUEMA[esquema] ?? COLECCIONES_POR_ESQUEMA[1] ?? [];
+}
 
 /** Forma de la exportación JSON y de los datos sobre los que trabajan las migraciones. */
 export interface Exportacion {
@@ -166,6 +205,6 @@ export interface Exportacion {
 export function coleccionesVacias(): Colecciones {
   return {
     ajustes: [], fuentes: [], intentos: [], lecturas: [], escritos: [],
-    tarjetas: [], repasos: [], predicciones: [], sesiones: [], aprendizajes: [],
+    tarjetas: [], repasos: [], predicciones: [], sesiones: [], aprendizajes: [], retos: [],
   };
 }

@@ -1,5 +1,6 @@
 /* Cliente de sincronización: envía los cambios pendientes a /api/sync y aplica los que llegan. */
 import type { PeticionSync, RespuestaSync } from '../dominio/sincronizacion';
+import { ESQUEMA_VERSION } from '../dominio/tipos';
 import type { Almacen } from './almacen';
 
 export class ErrorDeSync extends Error {
@@ -18,7 +19,7 @@ export async function sincronizar(almacen: Almacen, { url = '/api/sync', fetch =
   const token = await almacen.meta('token');
   if (!token) throw new ErrorDeSync('sin-token', 'Falta la clave de sincronización de este dispositivo.');
   const cambios = await almacen.pendientes();
-  const peticion: PeticionSync = { desde: (await almacen.meta('cursor')) ?? 0, cambios };
+  const peticion: PeticionSync = { desde: (await almacen.meta('cursor')) ?? 0, cambios, esquema: ESQUEMA_VERSION };
 
   let res: Response;
   try {

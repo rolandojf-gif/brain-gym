@@ -28,8 +28,18 @@ describe('migrar', () => {
     expect(r.datos.predicciones[0]).toMatchObject({ id: 'p', categoria: 'general' });
   });
 
+  it('v1 → v2: añade la colección de retos generados y no toca lo demás', () => {
+    const intento = { id: 'i', creado: 'x', actualizado: 'x', borrado: false, ejercicio: '1.1', estado: 'sin_ayuda' };
+    const v1 = { app: 'brain-gym', esquema: 1, exportadoEl: 'x', datos: { intentos: [intento], ajustes: [] } };
+    const r = migrar(v1);
+    expect(r.esquema).toBe(2);
+    expect(r.datos.retos).toEqual([]);
+    expect(r.datos.intentos).toEqual([intento]);
+  });
+
   it('falla si falta un eslabón', () => {
     expect(() => migrar({ app: 'brain-gym', esquema: 1, exportadoEl: '', datos: {} }, {}, 2)).toThrow(/Falta la migración/);
+    expect(() => migrar({ app: 'brain-gym', esquema: 2, exportadoEl: '', datos: {} }, {}, 3)).toThrow(/Falta la migración de la versión 2/);
   });
 
   it.each([

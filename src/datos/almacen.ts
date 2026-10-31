@@ -9,8 +9,8 @@ import { fusionar, ganador, type Cambio } from '../dominio/sincronizacion';
 import { COLECCIONES, ESQUEMA_VERSION, coleccionesVacias, type Base, type Coleccion, type Colecciones, type Exportacion, type Lectura } from '../dominio/tipos';
 
 /* La versión de IndexedDB sólo cambia si cambia la lista de tiendas o índices; la forma de los datos la versiona
-   ESQUEMA_VERSION con migraciones puras. */
-const VERSION_IDB = 1;
+   ESQUEMA_VERSION con migraciones puras. v2: tienda `retos`. */
+const VERSION_IDB = 2;
 const META = 'meta';
 const PENDIENTES = 'pendientes';
 
@@ -42,6 +42,9 @@ export class Almacen {
       const antes: Exportacion = { ...exportar(await this.leerTodo(), ahora), esquema };
       await this.ponerMeta('copia', antes);
       await this.sustituir(migrar(antes).datos);
+      // Con el esquema anterior el servidor no enviaba las colecciones nuevas, pero el cursor sí avanzaba: se vuelve
+      // a pedir todo para no perder lo que el otro dispositivo ya hubiera subido. La fusión es idempotente.
+      await this.ponerMeta('cursor', 0);
     }
     await this.ponerMeta('esquema', ESQUEMA_VERSION);
     if ((await this.db.count('ajustes')) === 0) {

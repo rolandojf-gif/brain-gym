@@ -50,6 +50,7 @@ function autorizado(cabecera: string | null): boolean {
 function validar(v: unknown): PeticionSync {
   const p = v as Partial<PeticionSync> | null;
   if (!p || typeof p.desde !== 'number' || !Array.isArray(p.cambios)) throw new Error('forma');
+  if (p.esquema !== undefined && (typeof p.esquema !== 'number' || !Number.isInteger(p.esquema) || p.esquema < 1)) throw new Error('esquema');
   for (const c of p.cambios) {
     if (typeof c?.coleccion !== 'string' || typeof c.registro?.id !== 'string' || typeof c.registro.actualizado !== 'string') throw new Error('cambio');
   }

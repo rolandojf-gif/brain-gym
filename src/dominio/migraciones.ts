@@ -13,8 +13,11 @@ export interface DatosVersionados {
 
 export type Migracion = (d: DatosVersionados) => DatosVersionados;
 
-/** Clave: versión de origen. `MIGRACIONES[1]` llevará de la v1 a la v2 cuando haga falta. */
-export const MIGRACIONES: Readonly<Record<number, Migracion>> = {};
+/** Clave: versión de origen. */
+export const MIGRACIONES: Readonly<Record<number, Migracion>> = {
+  // v1 → v2: nace la colección `retos` (retos generados por IA). Los registros existentes no cambian.
+  1: (d) => ({ ...d, esquema: 2, datos: { ...d.datos, retos: d.datos.retos ?? [] } }),
+};
 
 export class ErrorDeDatos extends Error {
   override name = 'ErrorDeDatos';
