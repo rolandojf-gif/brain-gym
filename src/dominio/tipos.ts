@@ -1,5 +1,6 @@
-/* Modelo de datos v1 (ver docs/arquitectura.md). Cualquier cambio de forma exige subir ESQUEMA_VERSION
-   y añadir una migración en migraciones.ts. */
+/* Modelo de datos v1 (ver docs/arquitectura.md). Un cambio incompatible (quitar o renombrar un campo, cambiar su
+   significado o añadir una colección) exige subir ESQUEMA_VERSION y añadir una migración en migraciones.ts. Un campo
+   opcional nuevo no: los registros sin él siguen siendo válidos y una app anterior lo conserva al sincronizar. */
 
 export const ESQUEMA_VERSION = 1;
 
@@ -45,6 +46,8 @@ export interface Intento extends Base {
   notaError: string;
   dia: string;
   tarjetaId?: string;
+  /** Confianza declarada en la jugada inicial (0–1), antes de ver pista o solución. Alimenta la calibración. */
+  confianza?: number;
 }
 
 export type EstadoLectura = 'pendiente' | 'leida' | 'escrita' | 'descartada';

@@ -1,5 +1,7 @@
-/* Brier y curva de calibración de las predicciones resueltas. Las anuladas no cuentan. */
-import type { Prediccion } from './tipos';
+/* Brier y curva de calibración: de las predicciones resueltas (las anuladas no cuentan) y de la confianza
+   declarada en los retos. */
+import { ID_FUENTE_RETOS, intentosContables, type Reto } from './catalogo-retos';
+import type { Intento, Prediccion } from './tipos';
 
 export interface Resuelta {
   probabilidad: number;
@@ -75,4 +77,79 @@ export function brierPorCategoria(predicciones: readonly Prediccion[]): { catego
     })
     .filter((g) => g.n > 0)
     .sort((a, b) => b.n - a.n || a.categoria.localeCompare(b.categoria));
+}
+
+/** Niveles de confianza que ofrece un reto. Con cuatro opciones el azar ya da un 25 %, así que el nivel bajo es
+    «casi a ciegas»; un mínimo más alto obligaría a declarar exceso de confianza cada vez que dudas. */
+export const NIVELES_CONFIANZA = [0.3, 0.6, 0.9] as const;
+
+/**
+ * Retos con confianza declarada, como predicciones resueltas. Sólo cuenta el primer intento de cada reto: en un
+ * reintento ya conoces la solución. Los de debate no tienen acierto posible. El acierto es la jugada inicial
+ * correcta, que es justo el estado «sin ayuda» (ver `estadoAutomatico`).
+ */
+export function resueltasDeRetos(intentos: readonly Intento[]): Resuelta[] {
+  const vivos = intentosContables(intentos.filter((i) => !i.borrado && i.fuenteId === ID_FUENTE_RETOS))
+    .sort((a, b) => a.creado.localeCompare(b.creado));
+  const vistos = new Set<string>();
+  const salida: Resuelta[] = [];
+  for (const i of vivos) {
+    if (vistos.has(i.ejercicio)) continue;
+    vistos.add(i.ejercicio);
+    const c = i.confianza;
+    if (typeof c === 'number' && Number.isFinite(c) && c >= 0 && c <= 1) {
+      salida.push({ probabilidad: c, ocurrio: i.estado === 'sin_ayuda' });
+    }
+  }
+  return salida;
+}
+
+/** Se pide confianza sólo si el intento va a contar: reto con respuesta correcta y sin intentos previos. */
+export function pideConfianza(reto: Pick<Reto, 'id' | 'debate'>, intentos: readonly Intento[]): boolean {
+  return !reto.debate && !intentos.some((i) => !i.borrado && i.fuenteId === ID_FUENTE_RETOS && i.ejercicio === reto.id);
+}
+
+export interface CalibracionRetos {
+  n: number;
+  brier: number | null;
+  /** Brier de decir siempre tu propia tasa de acierto, h(1 − h). Quedar por debajo significa que tu confianza
+      distingue los retos que sabes de los que no. */
+  referencia: number | null;
+  confianzaMedia: number | null;
+  tasaAcierto: number | null;
+  /** Confianza media menos tasa de acierto: positivo, te pasas de confiado; negativo, te quedas corto. */
+  sesgo: number | null;
+  /** Dos errores típicos del sesgo si estuvieras bien calibrado (cada acierto, Bernoulli con tu confianza).
+      Un sesgo dentro de ±margen es compatible con el azar. */
+  margen: number | null;
+  niveles: { confianza: number; n: number; aciertos: number }[];
+}
+
+export function calibracionRetos(intentos: readonly Intento[]): CalibracionRetos {
+  const rs = resueltasDeRetos(intentos);
+  const n = rs.length;
+  const grupos = new Map<number, { n: number; aciertos: number }>();
+  for (const r of rs) {
+    const g = grupos.get(r.probabilidad) ?? { n: 0, aciertos: 0 };
+    g.n++;
+    if (r.ocurrio) g.aciertos++;
+    grupos.set(r.probabilidad, g);
+  }
+  const niveles = [...grupos.entries()].map(([confianza, g]) => ({ confianza, ...g })).sort((a, b) => a.confianza - b.confianza);
+  if (n === 0) {
+    return { n, brier: null, referencia: null, confianzaMedia: null, tasaAcierto: null, sesgo: null, margen: null, niveles };
+  }
+  const confianzaMedia = rs.reduce((s, r) => s + r.probabilidad, 0) / n;
+  const tasaAcierto = rs.filter((r) => r.ocurrio).length / n;
+  const varianza = rs.reduce((s, r) => s + r.probabilidad * (1 - r.probabilidad), 0);
+  return {
+    n,
+    brier: brier(rs),
+    referencia: tasaAcierto * (1 - tasaAcierto),
+    confianzaMedia,
+    tasaAcierto,
+    sesgo: confianzaMedia - tasaAcierto,
+    margen: (2 * Math.sqrt(varianza)) / n,
+    niveles,
+  };
 }

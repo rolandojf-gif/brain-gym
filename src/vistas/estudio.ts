@@ -17,6 +17,7 @@ import {
   type InspeccionReto,
   type Reto,
 } from '../dominio/catalogo-retos';
+import { NIVELES_CONFIANZA, pideConfianza } from '../dominio/calibracion';
 import { ETIQUETA_ESTADO, desgloseResolucion, progresoPorCapitulo } from '../dominio/estudio';
 import { nuevaTarjeta } from '../dominio/fsrs';
 import { actualizar, borrar, nuevo } from '../dominio/registro';
@@ -31,28 +32,36 @@ interface EstadoAcordeon {
   /** Jugada fijada antes de la pista: decide si cuenta como «sin ayuda». */
   opcionInicial: string;
   opcionElegida: string;
+  /** Confianza en la jugada inicial; null si no se pide (debate o reintento). */
+  confianza: number | null;
   logica: string;
   pistaDesbloqueada: boolean;
   inicioMs: number;
 }
+
+/** Cómo se lee cada nivel de NIVELES_CONFIANZA, en el mismo orden. */
+const LECTURA_CONFIANZA = ['casi a ciegas', 'me inclino', 'lo tengo claro'];
 
 let filtroBloque = 'todos';
 let estadoActual: EstadoAcordeon | null = null;
 const revisionesAbiertas = new Set<string>();
 
 function asegurarEstado(reto: Reto): EstadoAcordeon {
-  if (!estadoActual || estadoActual.retoId !== reto.id) {
-    estadoActual = {
-      retoId: reto.id,
-      paso: 1,
-      opcionInicial: '',
-      opcionElegida: '',
-      logica: '',
-      pistaDesbloqueada: false,
-      inicioMs: Date.now(),
-    };
-  }
+  if (!estadoActual || estadoActual.retoId !== reto.id) estadoActual = estadoNuevo(reto.id);
   return estadoActual;
+}
+
+function estadoNuevo(retoId: string): EstadoAcordeon {
+  return {
+    retoId,
+    paso: 1,
+    opcionInicial: '',
+    opcionElegida: '',
+    confianza: null,
+    logica: '',
+    pistaDesbloqueada: false,
+    inicioMs: Date.now(),
+  };
 }
 
 function retoActivo(ctx: Ctx): Reto {
@@ -70,7 +79,7 @@ function retoActivo(ctx: Ctx): Reto {
   return siguienteRetoPendiente(ctx.datos.intentos, filtroBloque);
 }
 
-function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoIntento | null): string {
+function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoIntento | null, pedirConfianza: boolean): string {
   const bloque = BLOQUES_RETOS.find((b) => b.id === reto.bloque);
   const tagPrevio = estadoPrevio
     ? `<span class="tag e-${estadoPrevio}">${esc(ETIQUETA_ESTADO[estadoPrevio])}</span>`
@@ -105,7 +114,7 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
     est.paso >= 2
       ? `<div class="reto-paso">
            <div class="lbl">Paso 2 · Andamiaje opcional</div>
-           <p class="m-sub">Jugada fijada: <b>Opción ${esc(letraVisible(reto, est.opcionInicial))}</b>${est.logica ? ` · «${esc(est.logica)}»` : ''}</p>
+           <p class="m-sub">Jugada fijada: <b>Opción ${esc(letraVisible(reto, est.opcionInicial))}</b>${est.confianza === null ? '' : ` · confianza ${esc(fmtPct(est.confianza))}`}${est.logica ? ` · «${esc(est.logica)}»` : ''}</p>
            ${
              est.pistaDesbloqueada
                ? `<div class="reto-pista"><b>Pista desbloqueada:</b> ${esc(reto.pista)}<p class="m-sub">Si has detectado el fallo, puedes cambiar la opción marcada arriba antes de ver la resolución.</p></div>`
@@ -161,6 +170,7 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
       <form class="form-bloque" data-accion="fijar-jugada">
         <div class="lbl">Paso 1 · Compromiso y jugada inicial</div>
         <div class="reto-opciones">${bloqueOpciones}</div>
+        ${pedirConfianza ? renderConfianza(est) : ''}
         <label class="campo">
           ¿Cuál es tu lógica? (1 línea, opcional)
           <input name="logica" value="${esc(est.logica)}" placeholder="Por qué eliges esta jugada y qué trampa descartas…" autocomplete="off"${est.paso > 1 ? ' readonly' : ''}>
@@ -170,6 +180,16 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
       ${paso2}
       ${paso3}
     </article>`;
+}
+
+// Se compromete junto con la jugada, antes de la pista: es la probabilidad que se puntúa con Brier.
+function renderConfianza(est: EstadoAcordeon): string {
+  const bloqueado = est.paso > 1 ? ' disabled' : '';
+  const niveles = NIVELES_CONFIANZA.map((c, i) => {
+    const checked = est.confianza === c ? ' checked' : '';
+    return `<label><input type="radio" name="confianza" value="${c}"${checked}${bloqueado} required> <b>${esc(fmtPct(c))}</b> <span class="m-sub">${esc(LECTURA_CONFIANZA[i] ?? '')}</span></label>`;
+  }).join('');
+  return `<fieldset class="seg-radio"><legend>¿Cuánto confías en tu jugada?</legend>${niveles}</fieldset>`;
 }
 
 export function renderPanelRevision(ctx: Ctx, insp: InspeccionReto): string {
@@ -262,7 +282,7 @@ function filaIntento(ctx: Ctx, i: Intento): string {
       <div class="li-main">
         <b>${esc(titulo)} <span class="tag e-${i.estado}">${esc(ETIQUETA_ESTADO[i.estado])}</span></b>
         ${i.notaError ? `<span>${esc(i.notaError)}</span>` : ''}
-        <span class="m-sub">${esc(fmtRelativo(i.dia, ctx.hoy))}${i.segundos ? ` · ${esc(fmtDuracion(i.segundos))}` : ''}${tarjeta ? ' · con tarjeta FSRS' : ''}</span>
+        <span class="m-sub">${esc(fmtRelativo(i.dia, ctx.hoy))}${i.segundos ? ` · ${esc(fmtDuracion(i.segundos))}` : ''}${typeof i.confianza === 'number' ? ` · confianza ${esc(fmtPct(i.confianza))}` : ''}${tarjeta ? ' · con tarjeta FSRS' : ''}</span>
       </div>
       <div class="li-acc">${verAnalisis}${crear}<button class="btn sutil" data-accion="borrar-intento" data-id="${esc(i.id)}">Borrar</button></div>
     </li>`;
@@ -339,7 +359,7 @@ export const estudio: Vista = {
         </div>
 
         <h2 class="sec">Siguiente reto pendiente</h2>
-        ${renderAcordeon(reto, est, estadoPrevio)}
+        ${renderAcordeon(reto, est, estadoPrevio, pideConfianza(reto, intentos))}
 
         <h2 class="sec">Catálogo integrado (${CATALOGO_RETOS.length} retos · ${BLOQUES_RETOS.length} bloques)</h2>
         <p class="note">Tasa global sin ayuda: <b>${fmtPct(desglose.tasaSinAyuda)}</b> (${plural(desglose.total, 'intento registrado', 'intentos registrados')}: ${desglose.sinAyuda} sin ayuda, ${desglose.conPista} con pista, ${desglose.solucion} mirando solución). Haz clic en cualquier reto completado para desplegar su análisis, opciones y regla mental.</p>
@@ -353,15 +373,7 @@ export const estudio: Vista = {
     accion(raiz, 'click', 'filtrar-bloque', (b) => {
       filtroBloque = b.dataset.bloque ?? 'todos';
       const sig = siguienteRetoPendiente(ctx.datos.intentos, filtroBloque);
-      estadoActual = {
-        retoId: sig.id,
-        paso: 1,
-        opcionInicial: '',
-        opcionElegida: '',
-        logica: '',
-        pistaDesbloqueada: false,
-        inicioMs: Date.now(),
-      };
+      estadoActual = estadoNuevo(sig.id);
       if (ctx.sub) ctx.ir('#estudio');
       else ctx.pintar();
     });
@@ -370,15 +382,7 @@ export const estudio: Vista = {
       const id = b.dataset.id ?? '';
       const buscado = CATALOGO_RETOS.find((r) => r.id === id);
       if (!buscado) return;
-      estadoActual = {
-        retoId: buscado.id,
-        paso: 1,
-        opcionInicial: '',
-        opcionElegida: '',
-        logica: '',
-        pistaDesbloqueada: false,
-        inicioMs: Date.now(),
-      };
+      estadoActual = estadoNuevo(buscado.id);
       if (ctx.sub) ctx.ir('#estudio');
       else ctx.pintar();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -419,15 +423,7 @@ export const estudio: Vista = {
       const reto = CATALOGO_RETOS.find((r) => r.id === id);
       if (!reto) return;
       revisionesAbiertas.delete(id);
-      estadoActual = {
-        retoId: reto.id,
-        paso: 1,
-        opcionInicial: '',
-        opcionElegida: '',
-        logica: '',
-        pistaDesbloqueada: false,
-        inicioMs: Date.now(),
-      };
+      estadoActual = estadoNuevo(reto.id);
       ctx.avisar(`Reto ${reto.id} listo en el ring superior. Tus intentos anteriores se conservan.`);
       if (ctx.sub) ctx.ir('#estudio');
       else ctx.pintar();
@@ -446,6 +442,13 @@ export const estudio: Vista = {
       const est = asegurarEstado(reto);
       const v = campos(form as HTMLFormElement);
       if (!v.opcion) return ctx.avisar('Selecciona una opción antes de fijar tu jugada.', 'error');
+      if (pideConfianza(reto, ctx.datos.intentos)) {
+        const c = Number(v.confianza);
+        if (!(NIVELES_CONFIANZA as readonly number[]).includes(c)) return ctx.avisar('Marca cuánto confías en tu jugada antes de fijarla.', 'error');
+        est.confianza = c;
+      } else {
+        est.confianza = null;
+      }
       est.opcionInicial = v.opcion;
       est.opcionElegida = v.opcion;
       est.logica = v.logica ?? '';
@@ -493,6 +496,7 @@ export const estudio: Vista = {
           segundos,
           notaError: resumenJugada,
           dia: ctx.hoy,
+          ...(est.confianza === null ? {} : { confianza: est.confianza }),
         },
         ahora,
       );
@@ -513,15 +517,7 @@ export const estudio: Vista = {
       await ctx.registrar('estudio', segundos);
 
       const siguiente = siguienteRetoPendiente(ctx.datos.intentos, filtroBloque);
-      estadoActual = {
-        retoId: siguiente.id,
-        paso: 1,
-        opcionInicial: '',
-        opcionElegida: '',
-        logica: '',
-        pistaDesbloqueada: false,
-        inicioMs: Date.now(),
-      };
+      estadoActual = estadoNuevo(siguiente.id);
 
       ctx.avisar(
         estado === 'solucion'
