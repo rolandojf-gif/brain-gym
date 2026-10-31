@@ -87,6 +87,30 @@ describe('validación del reto generado', () => {
     expect(() => validarRetoPropuesto(cambiar(valido()), '1')).toThrow(ErrorRetoIa);
   });
 
+  it('tolera claves renombradas, sin tildes o en inglés, y un objeto envoltorio', () => {
+    const v = valido();
+    const renombrado = {
+      Título: v.titulo,
+      situación: v.escenario,
+      options: v.opciones.map(({ id, texto, porQue }) => ({ letra: id.toLowerCase(), text: texto, por_qué: porQue })),
+      respuesta_correcta: ' a ',
+      hint: v.pista,
+      solución: v.solucion,
+      modelo_mental: v.modeloMental,
+      source: { title: v.fuente.titulo, link: v.fuente.url },
+    };
+    const r = validarRetoPropuesto(renombrado, '5');
+    expect(r).toMatchObject({ titulo: v.titulo, escenario: v.escenario, opcionCorrecta: 'A', pista: v.pista, fuente: v.fuente });
+    expect(r.opciones[0]).toEqual({ id: 'A', texto: v.opciones[0]?.texto, porQue: v.opciones[0]?.porQue });
+    expect(validarRetoPropuesto({ reto: v }, '1').titulo).toBe(v.titulo);
+  });
+
+  it('si falta un campo, el error dice qué claves llegaron', () => {
+    const sinEscenario: Record<string, unknown> = { ...valido(), descripcionLarga: 'x' };
+    delete sinEscenario.escenario;
+    expect(() => validarRetoPropuesto(sinEscenario, '1')).toThrow(/Falta «escenario»\. Claves recibidas: titulo, opciones, .*descripcionLarga/);
+  });
+
   it('extrae el JSON aunque venga envuelto en markdown', () => {
     const r = parsearRetoGenerado(`Aquí va:\n\`\`\`json\n${JSON.stringify(valido())}\n\`\`\``, '5');
     expect(r.titulo).toBe('La pausa que nadie firma');

@@ -36,13 +36,17 @@ const reto = {
   fuente: { titulo: 'Carrera armamentista', url: FUENTE },
 };
 
-const respuestaModelo = (texto: string) => new Response(JSON.stringify({ choices: [{ message: { content: texto } }] }), { status: 200 });
+const respuestaModelo = (texto: string, fin = 'stop') =>
+  new Response(JSON.stringify({ choices: [{ message: { content: texto }, finish_reason: fin }] }), { status: 200 });
 
-/** fetch simulado: OpenRouter responde en orden con `modelo`; la fuente, con `estadoFuente`. */
-function simular(modelo: string[], estadoFuente: number | 'red' = 200) {
+/** fetch simulado: OpenRouter responde en orden con `modelo` (texto, o texto y finish_reason); la fuente, con `estadoFuente`. */
+function simular(modelo: (string | [string, string])[], estadoFuente: number | 'red' = 200) {
   const cola = [...modelo];
   return vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
-    if (String(url).startsWith('https://openrouter.ai/')) return respuestaModelo(cola.shift() ?? '');
+    if (String(url).startsWith('https://openrouter.ai/')) {
+      const siguiente = cola.shift() ?? '';
+      return typeof siguiente === 'string' ? respuestaModelo(siguiente) : respuestaModelo(...siguiente);
+    }
     if (estadoFuente === 'red') throw new TypeError('fetch failed');
     return new Response('<html></html>', { status: estadoFuente });
   });
@@ -99,6 +103,20 @@ describe('/api/retos', () => {
     expect(await res.json()).toMatchObject({ motivo: 'formato' });
     expect(llamadasOpenRouter(spy)).toHaveLength(1);
     expect(blobs.m.valor).toMatchObject({ usadas: 1 });
+  });
+
+  it('descarta una respuesta cortada por longitud sin intentar leerla, aunque traiga un borrador', async () => {
+    const spy = simular([[`Pensando… ${JSON.stringify(reto)}`, 'length']]);
+    const res = await handler(peticion({ tema: '1' }));
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ motivo: 'formato', error: expect.stringContaining('se cortó') });
+    expect(llamadasOpenRouter(spy)).toHaveLength(1);
+  });
+
+  it('un revisor cortado por longitud descarta el reto con ese motivo', async () => {
+    simular([JSON.stringify(reto), ['{"aprobado": tr', 'length']]);
+    const res = await handler(peticion({ tema: '1' }));
+    expect(await res.json()).toMatchObject({ motivo: 'revisor', error: expect.stringContaining('se cortó') });
   });
 
   it.each([[404], [410], [500], ['red' as const]])('descarta si la fuente responde %s', async (estado) => {
