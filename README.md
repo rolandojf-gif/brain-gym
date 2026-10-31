@@ -1,6 +1,6 @@
 # BRAIN.GYM
 
-Web personal para la rutina de entrenamiento cognitivo: al abrirla dice qué toca hoy, se hace y queda registrado.
+Web personal para aprender por curiosidad: al abrirla eliges un reto, una lectura o una idea, la haces y queda registrada.
 
 - Brief: [`docs/brief.md`](docs/brief.md)
 - Decisiones: [`docs/decisiones.md`](docs/decisiones.md)

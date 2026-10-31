@@ -1,38 +1,7 @@
-/* Sesión del día: qué toca según el plan, qué tarjetas vencen hoy y qué ya está hecho. Pura: recibe la hora. */
-import { diaLogico, diaSemana } from '../lib/dia';
-import { vencidas } from './fsrs';
+/* Registro de sesiones: una por día y actividad, con el tiempo dedicado. Ya no alimenta ninguna vista (salieron el plan
+   semanal y el calendario), pero se sigue guardando: es dato del usuario y viaja en la exportación. */
 import { nuevo } from './registro';
-import type { Actividad, Ajustes, Colecciones, Sesion, Tarjeta } from './tipos';
-
-export interface SesionDeHoy {
-  dia: string;
-  actividades: { actividad: Actividad; hecha: boolean }[];
-  pendiente: {
-    tarjetasVencidas: Tarjeta[];
-  };
-}
-
-export function sesionDeHoy(ahora: Date, ajustes: Ajustes, datos: Pick<Colecciones, 'sesiones' | 'tarjetas'>): SesionDeHoy {
-  const dia = diaLogico(ahora, ajustes.horaCorte);
-  const semana = diaSemana(ahora, ajustes.horaCorte) as keyof Ajustes['planSemanal'];
-  const hechas = new Set(datos.sesiones.filter((s) => !s.borrado && s.dia === dia).map((s) => s.actividad));
-  const plan = (ajustes.planSemanal[semana] ?? []).filter((a) => a !== 'calibracion');
-
-  return {
-    dia,
-    actividades: plan.map((actividad) => ({ actividad, hecha: hechas.has(actividad) })),
-    pendiente: {
-      tarjetasVencidas: vencidas(datos.tarjetas, ahora),
-    },
-  };
-}
-
-/** Suma días a una fecha AAAA-MM-DD sin depender de la zona horaria. */
-export function sumarDias(dia: string, n: number): string {
-  const d = new Date(`${dia}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
+import type { Actividad, Sesion } from './tipos';
 
 /* Una sesión por día y actividad, con id fijo: si se registra desde los dos dispositivos, la sincronización la funde
    en un solo registro en lugar de duplicarla. */

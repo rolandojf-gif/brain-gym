@@ -1,201 +1,127 @@
-/* 01 · Hoy: protocolo «Sprint Diario (10 min)» en 3 bloques de ejecución inmediata:
-   1º Calentamiento FSRS (2-3 min) · 2º Plato principal: Reto del Día o Lectura 3x1 (5-7 min) · 3º Cierre rápido (1 min). */
+/* 01 · Hoy: un menú, no una agenda. Tres cosas para elegir (un reto, una lectura, una idea) y, si hay tarjetas
+   vencidas, una línea discreta para repasarlas. Nada se marca como pendiente ni hecho. */
 import { accion, campos, type Ctx, type Vista } from '../app';
-import { BLOQUES_RETOS, siguienteRetoPendiente } from '../dominio/catalogo-retos';
-import { nuevaTarjeta, previsualizar, repasar } from '../dominio/fsrs';
+import { BLOQUES_RETOS, siguienteRetoPendiente, temaSiguiente, type BloqueRetos } from '../dominio/catalogo-retos';
+import { nuevaTarjeta, vencidas } from '../dominio/fsrs';
 import { actualizar, nuevo } from '../dominio/registro';
-import { sesionDeHoy } from '../dominio/sesion';
-import type { Aprendizaje, Nota } from '../dominio/tipos';
-import { fmtDuracion, fmtFechaLarga, plural } from '../lib/fmt';
+import type { Aprendizaje } from '../dominio/tipos';
+import { fmtFechaLarga, plural } from '../lib/fmt';
 import { esc, urlSegura } from '../lib/html';
 import { cabecera } from './comun';
 
-let reveladaHoy: string | null = null;
+/** Tema elegido a mano en el selector. Vale hasta que se juega un reto: después vuelve la rotación. */
+let temaElegido: { id: BloqueRetos['id']; el: string } | null = null;
 
-const NOTAS: { nota: Nota; texto: string }[] = [
-  { nota: 1, texto: 'Otra vez' },
-  { nota: 2, texto: 'Difícil' },
-  { nota: 3, texto: 'Bien' },
-  { nota: 4, texto: 'Fácil' },
-];
-
-function intervaloCorto(iso: string, ahora: Date): string {
-  const min = Math.round((Date.parse(iso) - ahora.getTime()) / 60_000);
-  if (min < 60) return `${Math.max(1, min)}m`;
-  if (min < 1440) return `${Math.round(min / 60)}h`;
-  return `${Math.round(min / 1440)}d`;
+function temaActual(ctx: Ctx): BloqueRetos['id'] {
+  const rotacion = temaSiguiente(ctx.datos.intentos);
+  if (temaElegido && ctx.datos.intentos.some((i) => i.creado > (temaElegido?.el ?? ''))) temaElegido = null;
+  return temaElegido?.id ?? rotacion;
 }
 
-function renderCalentamiento(ctx: Ctx, s: ReturnType<typeof sesionDeHoy>): string {
-  const vencidas = s.pendiente.tarjetasVencidas;
-  const hecha = s.actividades.some((a) => a.actividad === 'repaso' && a.hecha) || vencidas.length === 0;
-  const primera = vencidas[0];
-
-  const cuerpo = primera
-    ? (() => {
-        const mostrar = reveladaHoy === primera.id;
-        const prev = previsualizar(primera, ctx.ahora);
-        return `
-          <p class="m-sub">${plural(vencidas.length, 'tarjeta vencida hoy', 'tarjetas vencidas hoy')}. Repásalas aquí mismo o abre la cola completa.</p>
-          <div class="flash-inline">
-            <div class="lbl">Anverso</div>
-            <p class="flash-q">${esc(primera.anverso).replace(/\n/g, '<br>')}</p>
-            ${
-              mostrar
-                ? `<div class="lbl">Reverso</div>
-                   <p class="flash-a">${esc(primera.reverso).replace(/\n/g, '<br>')}</p>
-                   <div class="notas">
-                     ${NOTAS.map((n) => `<button type="button" class="btn nota n${n.nota}" data-accion="repasar-inline" data-nota="${n.nota}"><b>${n.texto}</b><small>${intervaloCorto(prev[n.nota], ctx.ahora)}</small></button>`).join('')}
-                   </div>`
-                : `<div class="acciones"><button type="button" class="btn primario" data-accion="revelar-inline">[ Mostrar respuesta ]</button><a class="btn sutil" href="#repaso">Abrir #repaso</a></div>`
-            }
-          </div>`;
-      })()
-    : `<p>Mazo al día: 0 tarjetas vencidas ahora mismo.</p>
-       <div class="acciones"><a class="btn sutil" href="#repaso">Ir a #repaso</a></div>`;
-
-  return `
-    <article class="act${hecha ? ' hecha' : ''}">
-      <header>
-        <i>1º</i>
-        <h2>Calentamiento · FSRS (2–3 min)</h2>
-        <span class="estado">${vencidas.length === 0 ? 'Al día' : `${vencidas.length} pendientes`}</span>
-      </header>
-      ${cuerpo}
-    </article>`;
+function renderRepaso(ctx: Ctx): string {
+  const n = vencidas(ctx.datos.tarjetas, ctx.ahora).length;
+  if (n === 0) return '';
+  return `<p class="linea-repaso">${plural(n, 'tarjeta para repasar', 'tarjetas para repasar')} · <a href="#repaso">Repasar</a></p>`;
 }
 
-function renderPlatoPrincipal(ctx: Ctx, s: ReturnType<typeof sesionDeHoy>): string {
-  const plan = s.actividades.map((a) => a.actividad);
-  const tocaLectura = plan.includes('lectura') && !plan.includes('estudio');
-
-  if (tocaLectura) {
-    const hecha = s.actividades.some((a) => a.actividad === 'lectura' && a.hecha);
-    const porEscribir = ctx.datos.lecturas.find((l) => !l.borrado && l.estado === 'leida');
-    const siguiente = ctx.datos.lecturas.find((l) => !l.borrado && l.estado === 'pendiente');
-
-    let cuerpo: string;
-    if (porEscribir) {
-      cuerpo = `
-        <p>Lectura lista para comprimir: <b>«${esc(porEscribir.titulo)}»</b>.</p>
-        <p class="m-sub">Extrae de memoria la tesis central, el mecanismo y el punto ciego (formato 3x1).</p>
-        <div class="acciones">
-          <a class="btn primario" href="#lectura/escribir/${esc(porEscribir.id)}">[ Completar síntesis 3x1 ]</a>
-          <a class="btn sutil" href="#estudio">¿Prefieres jugar un reto?</a>
-        </div>`;
-    } else if (siguiente) {
-      const url = urlSegura(siguiente.url);
-      cuerpo = `
-        <p>Siguiente en cola: <b>«${esc(siguiente.titulo)}»</b>${siguiente.medio ? ` (${esc(siguiente.medio)})` : ''}.</p>
-        <div class="acciones">
-          ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Abrir lectura ↗</a>` : ''}
-          <button type="button" class="btn primario" data-accion="lectura-leida" data-id="${esc(siguiente.id)}">[ Leída · Extraer 3x1 ]</button>
-          <a class="btn sutil" href="#lectura">Ver cola</a>
-        </div>`;
-    } else {
-      cuerpo = `
-        <p>Hoy toca extracción de lectura 3x1, pero la cola está vacía.</p>
-        <div class="acciones">
-          <a class="btn primario" href="#lectura">[ Añadir lectura y extraer 3x1 ]</a>
-          <a class="btn sutil" href="#estudio">Jugar un reto estratégico</a>
-        </div>`;
-    }
-
-    return `
-      <article class="act${hecha ? ' hecha' : ''}">
-        <header>
-          <i>2º</i>
-          <h2>Plato principal · Lectura 3x1 (5–7 min)</h2>
-          <span class="estado">${hecha ? 'Completado hoy' : 'En turno'}</span>
-        </header>
-        ${cuerpo}
-      </article>`;
-  }
-
-  // Por defecto o cuando toca `estudio`: Reto del Día
-  const hecha = s.actividades.some((a) => a.actividad === 'estudio' && a.hecha);
-  const sesionEstudio = ctx.datos.sesiones.find((x) => !x.borrado && x.dia === ctx.hoy && x.actividad === 'estudio');
-  const tiempo = sesionEstudio && sesionEstudio.segundos > 0 ? ` · ${fmtDuracion(sesionEstudio.segundos)}` : '';
-  const reto = siguienteRetoPendiente(ctx.datos.intentos);
+function renderReto(ctx: Ctx): string {
+  const tema = temaActual(ctx);
+  const reto = siguienteRetoPendiente(ctx.datos.intentos, tema);
   const bloque = BLOQUES_RETOS.find((b) => b.id === reto.bloque);
+  const resumen = reto.escenario.length > 170 ? `${reto.escenario.slice(0, 170).trimEnd()}…` : reto.escenario;
+  const selector = BLOQUES_RETOS.map(
+    (b) =>
+      `<button type="button" class="seg-btn" data-accion="tema" data-tema="${esc(b.id)}" aria-pressed="${b.id === tema}">${esc(b.corto)}</button>`,
+  ).join('');
 
   return `
-    <article class="act${hecha ? ' hecha' : ''}">
-      <header>
-        <i>2º</i>
-        <h2>Plato principal · Reto del Día (5–7 min)</h2>
-        <span class="estado">${hecha ? `Hecho${tiempo}` : '1 reto basta'}</span>
-      </header>
-      <p class="m-sub">Bloque ${esc(reto.bloque)}: ${esc(bloque?.titulo ?? '')}</p>
-      <p><b>${esc(reto.id)} · ${esc(reto.titulo)}</b></p>
-      <p>${esc(reto.escenario.slice(0, 180))}…</p>
+    <article class="act">
+      <header><h2>Un reto</h2></header>
+      <p class="m-sub">${esc(bloque?.titulo ?? '')}</p>
+      <p><b>${esc(reto.titulo)}</b></p>
+      <p>${esc(resumen)}</p>
+      <div class="seg tema" role="group" aria-label="Tema del reto">${selector}</div>
       <div class="acciones">
-        <a class="btn primario" href="#estudio/reto/${esc(reto.id)}">${hecha ? '[ + Hacer otro reto ]' : '[ Jugar Reto del Día ]'}</a>
-        <a class="btn sutil" href="#lectura">Ir a Lectura 3x1</a>
+        <a class="btn primario" href="#estudio/reto/${esc(reto.id)}">[ Jugar ]</a>
       </div>
     </article>`;
 }
 
-function renderCierreRapido(ctx: Ctx): string {
-  const aprendizaje = ctx.datos.aprendizajes.find((x) => !x.borrado && x.dia === ctx.hoy);
-  const hecha = Boolean(aprendizaje);
+function renderLectura(ctx: Ctx): string {
+  const porEscribir = ctx.datos.lecturas.find((l) => !l.borrado && l.estado === 'leida');
+  const siguiente = ctx.datos.lecturas.find((l) => !l.borrado && l.estado === 'pendiente');
 
-  const cuerpo = aprendizaje
-    ? `<p><b>«${esc(aprendizaje.texto)}»</b>${aprendizaje.tarjetaId ? ' <span class="tag e-sin_ayuda">+ Tarjeta FSRS</span>' : ''}</p>
-       <p class="m-sub">Registrado en el cierre de hoy.</p>`
-    : `<form class="form-bloque" data-accion="aprendizaje">
-         <label class="campo">
-           Qué modelo mental o idea aprendí hoy (1 línea)
-           <input id="ap-texto" name="texto" required placeholder="Ej.: Ley de Goodhart: toda métrica usada como meta rígida será manipulada.">
-         </label>
-         <label class="check-linea">
-           <input type="checkbox" name="crearTarjeta" value="si" checked>
-           <span>[ Convertir también en tarjeta FSRS ]</span>
-         </label>
-         <div class="acciones"><button class="btn primario">Guardar cierre</button></div>
-       </form>`;
+  let cuerpo: string;
+  if (porEscribir) {
+    cuerpo = `
+      <p>Ya leíste <b>«${esc(porEscribir.titulo)}»</b>. Queda extraer de memoria la tesis, el mecanismo y el punto ciego.</p>
+      <div class="acciones">
+        <a class="btn primario" href="#lectura/escribir/${esc(porEscribir.id)}">[ Escribir el 3x1 ]</a>
+      </div>`;
+  } else if (siguiente) {
+    const url = urlSegura(siguiente.url);
+    cuerpo = `
+      <p><b>«${esc(siguiente.titulo)}»</b>${siguiente.medio ? ` <span class="m-sub">(${esc(siguiente.medio)})</span>` : ''}</p>
+      <div class="acciones">
+        ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Abrir ↗</a>` : ''}
+        <button type="button" class="btn primario" data-accion="lectura-leida" data-id="${esc(siguiente.id)}">[ Leída · escribir 3x1 ]</button>
+        <a class="btn sutil" href="#lectura">Ver cola</a>
+      </div>`;
+  } else {
+    cuerpo = `
+      <p>La cola está vacía.</p>
+      <div class="acciones"><a class="btn primario" href="#lectura">[ Añadir una lectura ]</a></div>`;
+  }
 
   return `
-    <article class="act${hecha ? ' hecha' : ''}">
-      <header>
-        <i>3º</i>
-        <h2>Cierre rápido · Modelo mental (1 min)</h2>
-        <span class="estado">${hecha ? 'Guardado' : 'Por hacer'}</span>
-      </header>
+    <article class="act">
+      <header><h2>Una lectura</h2></header>
       ${cuerpo}
+    </article>`;
+}
+
+function renderIdea(ctx: Ctx): string {
+  const deHoy = ctx.datos.aprendizajes.filter((x) => !x.borrado && x.dia === ctx.hoy).sort((a, b) => b.creado.localeCompare(a.creado));
+  const ultima = deHoy[0];
+  return `
+    <article class="act">
+      <header><h2>Una idea</h2></header>
+      ${ultima ? `<p class="m-sub">Hoy apuntaste: «${esc(ultima.texto)}»${deHoy.length > 1 ? ` y ${plural(deHoy.length - 1, 'otra', 'otras')}` : ''}.</p>` : ''}
+      <form class="form-bloque" data-accion="aprendizaje">
+        <label class="campo">
+          Una idea o modelo mental que te llevas (una línea)
+          <input name="texto" required placeholder="Ley de Goodhart: la métrica que se persigue deja de medir.">
+        </label>
+        <label class="check-linea">
+          <input type="checkbox" name="crearTarjeta" value="si" checked>
+          <span>Convertir también en tarjeta de repaso</span>
+        </label>
+        <div class="acciones"><button class="btn primario">[ Guardar ]</button></div>
+      </form>
     </article>`;
 }
 
 export const hoy: Vista = {
   titulo: 'Hoy',
   render(ctx) {
-    const s = sesionDeHoy(ctx.ahora, ctx.ajustes, ctx.datos);
     return `
       <section class="view">
-        ${cabecera('Sprint Diario (10 min)', `${fmtFechaLarga(s.dia)} · Sin fricción: calienta, resuelve 1 reto o síntesis 3x1 y cierra con 1 idea.`)}
-        <div class="acts sprint-grid">
-          ${renderCalentamiento(ctx, s)}
-          ${renderPlatoPrincipal(ctx, s)}
-          ${renderCierreRapido(ctx)}
+        ${cabecera('¿Qué te apetece?', `${fmtFechaLarga(ctx.hoy)} · Elige una cosa; con una basta.`)}
+        ${renderRepaso(ctx)}
+        <div class="acts">
+          ${renderReto(ctx)}
+          ${renderLectura(ctx)}
+          ${renderIdea(ctx)}
         </div>
       </section>`;
   },
   montar(ctx, raiz) {
-    accion(raiz, 'click', 'revelar-inline', () => {
-      const s = sesionDeHoy(ctx.ahora, ctx.ajustes, ctx.datos);
-      reveladaHoy = s.pendiente.tarjetasVencidas[0]?.id ?? null;
+    accion(raiz, 'click', 'tema', (b) => {
+      const id = BLOQUES_RETOS.find((x) => x.id === b.dataset.tema)?.id;
+      if (!id) return;
+      // Pulsar el tema que ya toca por rotación vuelve a la rotación.
+      temaElegido = id === temaSiguiente(ctx.datos.intentos) ? null : { id, el: new Date().toISOString() };
       ctx.pintar();
-    });
-
-    accion(raiz, 'click', 'repasar-inline', async (b) => {
-      const ahora = new Date();
-      const s = sesionDeHoy(ahora, ctx.ajustes, ctx.datos);
-      const t = s.pendiente.tarjetasVencidas[0];
-      if (!t) return;
-      const r = repasar(t, Number(b.dataset.nota) as Nota, ahora);
-      reveladaHoy = null;
-      await ctx.guardar({ coleccion: 'tarjetas', registro: r.tarjeta }, { coleccion: 'repasos', registro: r.repaso });
-      await ctx.registrar('repaso', 15);
     });
 
     accion(raiz, 'click', 'lectura-leida', async (b) => {
@@ -209,7 +135,7 @@ export const hoy: Vista = {
     accion(raiz, 'submit', 'aprendizaje', async (form, e) => {
       e.preventDefault();
       const v = campos(form as HTMLFormElement);
-      const texto = v.texto ?? '';
+      const texto = (v.texto ?? '').trim();
       if (!texto) return;
       const ahora = new Date();
       const baseAp: Aprendizaje = nuevo({ dia: ctx.hoy, texto }, ahora);
@@ -221,16 +147,16 @@ export const hoy: Vista = {
           ahora,
           { coleccion: 'aprendizajes', id: baseAp.id },
         );
-        const apConTarjeta: Aprendizaje = { ...baseAp, tarjetaId: tarjeta.id };
+        const conTarjeta: Aprendizaje = { ...baseAp, tarjetaId: tarjeta.id };
         await ctx.guardar(
-          { coleccion: 'aprendizajes', registro: apConTarjeta },
+          { coleccion: 'aprendizajes', registro: conTarjeta },
           { coleccion: 'tarjetas', registro: tarjeta },
         );
       } else {
         await ctx.guardar({ coleccion: 'aprendizajes', registro: baseAp });
       }
       await ctx.registrar('concepto');
-      ctx.avisar(v.crearTarjeta === 'si' ? 'Modelo mental guardado y convertido en tarjeta FSRS.' : 'Modelo mental guardado.');
+      ctx.avisar(v.crearTarjeta === 'si' ? 'Idea guardada y convertida en tarjeta de repaso.' : 'Idea guardada.');
     });
   },
 };

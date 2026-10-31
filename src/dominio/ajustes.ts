@@ -1,4 +1,5 @@
-/* Ajustes y datos iniciales: plan semanal de sprints cognitivos, catálogo integrado de retos y 12 lecturas semilla. */
+/* Ajustes y datos iniciales: corte del día, catálogo integrado de retos y 12 lecturas semilla. El plan semanal ya no se
+   usa en la interfaz, pero los ajustes lo siguen llevando por compatibilidad con datos y versiones anteriores. */
 import { CORTE_POR_DEFECTO } from '../lib/dia';
 import { fuenteRetos } from './catalogo-retos';
 import { nuevo } from './registro';
@@ -6,7 +7,7 @@ import type { Ajustes, Fuente, Lectura, PlanSemanal } from './tipos';
 
 export const ID_AJUSTES = 'ajustes';
 
-/** L-X-V retos estratégicos, M-J lectura 3x1, repaso y modelo mental a diario. Editable desde la app. */
+/** Plan de la versión del sprint diario (L-X-V retos, M-J lectura). Sin uso en la interfaz desde el 31 oct 2026. */
 export const PLAN_POR_DEFECTO: PlanSemanal = {
   0: ['estudio', 'repaso', 'concepto'],
   1: ['lectura', 'repaso', 'concepto'],
