@@ -1,6 +1,7 @@
 /* Estado de la aplicación y contexto que reciben las vistas. Una vista es una función que devuelve HTML más,
    opcionalmente, un `montar` que engancha los eventos sobre su propia sección (se crea de nuevo en cada pintado). */
 import type { Almacen } from './datos/almacen';
+import { Reponedor } from './datos/retos-ia';
 import { ErrorDeSync, sincronizar } from './datos/sincronizar';
 import { ID_AJUSTES, ajustesPorDefecto } from './dominio/ajustes';
 import { idSesion, registrarSesion } from './dominio/sesion';
@@ -24,6 +25,8 @@ export interface Ctx {
   avisar(texto: string, tipo?: 'ok' | 'error'): void;
   pintar(): void;
   sync: EstadoSync & { tieneToken: boolean };
+  /** Última novedad de los retos generados en segundo plano (vacío si aún no hay). */
+  retosIa: string;
   sincronizar(): Promise<void>;
   /** Guarda (o borra, con '') la clave de sincronización de este dispositivo y sincroniza. */
   ponerToken(token: string): Promise<void>;
@@ -48,12 +51,19 @@ export class App {
   tieneToken = false;
   private enCurso: Promise<void> | null = null;
   private diferida: ReturnType<typeof setTimeout> | undefined;
+  readonly reponedor: Reponedor;
 
   constructor(
     readonly almacen: Almacen,
     private readonly alCambiar: (forzar?: boolean) => void,
     private readonly alAvisar: (texto: string, tipo: 'ok' | 'error') => void,
-  ) {}
+  ) {
+    this.reponedor = new Reponedor({
+      almacen,
+      leer: () => this.datos,
+      guardar: (reto) => this.guardarDeFondo({ coleccion: 'retos', registro: reto }),
+    });
+  }
 
   async cargar(): Promise<void> {
     this.datos = await this.almacen.leerTodo();
@@ -82,10 +92,12 @@ export class App {
       avisar: (t, tipo = 'ok') => this.alAvisar(t, tipo),
       pintar: () => this.alCambiar(true),
       sync: { ...this.sync, tieneToken: this.tieneToken },
+      retosIa: this.reponedor.estado,
       sincronizar: () => this.sincronizar(),
       ponerToken: async (token) => {
         await this.almacen.ponerMeta('token', token);
         this.tieneToken = Boolean(token);
+        this.reponedor.reiniciar();
         await this.sincronizar();
       },
       recargar: async () => {
@@ -101,6 +113,13 @@ export class App {
     await this.almacen.guardar(...cambios);
     await this.cargar();
     this.alCambiar(true);
+    this.programarSync();
+  }
+
+  /** Guardado que no pide el usuario (un reto generado): no repinta, para no cambiar la pantalla mientras se usa. */
+  async guardarDeFondo(...cambios: Cambio[]): Promise<void> {
+    await this.almacen.guardar(...cambios);
+    await this.cargar();
     this.programarSync();
   }
 
@@ -139,6 +158,8 @@ export class App {
       } finally {
         this.enCurso = null;
       }
+      // Después de sincronizar, para ver antes los retos que ya generó el otro dispositivo y no duplicarlos.
+      void this.reponedor.reponer();
     })();
     return this.enCurso;
   }

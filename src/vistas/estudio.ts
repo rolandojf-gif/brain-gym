@@ -12,9 +12,12 @@ import {
   inspeccionarRetoCompletado,
   intentosContables,
   letraVisible,
+  nombreReto,
   opcionesVisibles,
+  retosJugables,
   siguienteRetoPendiente,
   temaSiguiente,
+  todosLosRetos,
   type InspeccionReto,
   type Reto,
 } from '../dominio/catalogo-retos';
@@ -22,9 +25,10 @@ import { NIVELES_CONFIANZA, pideConfianza } from '../dominio/calibracion';
 import { ETIQUETA_ESTADO, desgloseResolucion, progresoPorCapitulo } from '../dominio/estudio';
 import { nuevaTarjeta } from '../dominio/fsrs';
 import { actualizar, borrar, nuevo } from '../dominio/registro';
+import type { Cambio } from '../dominio/sincronizacion';
 import type { EstadoIntento, Intento } from '../dominio/tipos';
 import { fmtDuracion, fmtPct, fmtRelativo, plural } from '../lib/fmt';
-import { esc } from '../lib/html';
+import { esc, urlSegura } from '../lib/html';
 import { cabecera, vacio } from './comun';
 
 interface EstadoAcordeon {
@@ -68,14 +72,18 @@ function estadoNuevo(retoId: string): EstadoAcordeon {
   };
 }
 
+/** Catálogo y generados (también los reportados, para el historial y la revisión). */
+const retosDe = (ctx: Ctx): Reto[] => todosLosRetos(ctx.datos.retos);
+
 function retoActivo(ctx: Ctx): Reto {
+  const todos = retosDe(ctx);
   const [modo, id] = (ctx.sub ?? '').split('/');
   if (modo === 'reto' && id) {
-    const buscado = CATALOGO_RETOS.find((r) => r.id === id);
+    const buscado = todos.find((r) => r.id === id);
     if (buscado) return buscado;
   }
   if (estadoActual) {
-    const enCurso = CATALOGO_RETOS.find((r) => r.id === estadoActual?.retoId);
+    const enCurso = todos.find((r) => r.id === estadoActual?.retoId);
     if (enCurso && (filtroBloque === 'todos' || enCurso.bloque === filtroBloque)) {
       return enCurso;
     }
@@ -86,8 +94,41 @@ function retoActivo(ctx: Ctx): Reto {
 /** Con «Todos los bloques», el siguiente reto sigue la misma rotación de temas que Hoy. */
 function siguienteReto(ctx: Ctx): Reto {
   const intentos = ctx.datos.intentos;
-  return siguienteRetoPendiente(intentos, filtroBloque === 'todos' ? temaSiguiente(intentos) : filtroBloque);
+  const jugables = retosJugables(retosDe(ctx));
+  const tema = filtroBloque === 'todos' ? temaSiguiente(intentos, jugables) : filtroBloque;
+  return siguienteRetoPendiente(intentos, jugables, tema) ?? CATALOGO_RETOS[0];
 }
+
+/** De dónde sale un reto generado: fuente enlazada, modelo y veredicto del revisor. */
+function renderFuente(reto: Reto): string {
+  const g = reto.generado;
+  if (!g) return '';
+  const url = urlSegura(g.fuente.url);
+  const fuente = url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(g.fuente.titulo)} ↗</a>` : esc(g.fuente.titulo);
+  return `<p class="reto-fuente m-sub">Fuente: ${fuente} · Generado por ${esc(g.modelo || 'IA')}${g.revision ? ` · Revisor: «${esc(g.revision)}»` : ''}</p>`;
+}
+
+/** «Esto está mal» en un reto generado: sale de las estadísticas y no se vuelve a ofrecer. */
+function renderReportar(reto: Reto, desdeElRing: boolean): string {
+  const g = reto.generado;
+  if (!g) return '';
+  if (g.reportado) return `<p class="m-sub"><span class="tag e-solucion">Marcado como erróneo</span>${g.notaReporte ? ` «${esc(g.notaReporte)}»` : ''}</p>`;
+  return `
+    <details class="reto-reporte">
+      <summary>Esto está mal</summary>
+      <form class="form-bloque" data-accion="reportar-reto" data-id="${esc(reto.id)}">
+        <label class="campo">
+          ¿Qué falla? (opcional)
+          <input name="nota" maxlength="300" autocomplete="off" placeholder="Dos opciones valen, la fuente no dice eso…">
+        </label>
+        <p class="m-sub">Sale de las estadísticas y no se vuelve a ofrecer.${desdeElRing ? ' Tu jugada se guarda igualmente.' : ''}</p>
+        <div class="acciones"><button class="btn">[ Marcar como erróneo ]</button></div>
+      </form>
+    </details>`;
+}
+
+/** Por qué cada opción es buena o mala: sólo lo traen los generados, y sólo se enseña al resolver. */
+const porQue = (texto: string | undefined): string => (texto ? `<span class="op-porque">${esc(texto)}</span>` : '');
 
 function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoIntento | null, pedirConfianza: boolean): string {
   const bloque = BLOQUES_RETOS.find((b) => b.id === reto.bloque);
@@ -108,7 +149,7 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
         <label class="reto-opcion${claseExtra}">
           <input type="radio" name="opcion" value="${esc(op.id)}"${checked}${disabled} required>
           <span class="op-letra">${esc(op.letra)}</span>
-          <span class="op-texto">${esc(op.texto)}</span>
+          <span class="op-texto">${esc(op.texto)}${est.paso === 3 ? porQue(op.porQue) : ''}</span>
         </label>`;
     })
     .join('');
@@ -160,10 +201,12 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
              <span class="lbl">Modelo mental accionable (reverso FSRS)</span>
              <p><b>${esc(reto.modeloMental)}</b></p>
            </div>
+           ${renderFuente(reto)}
            <div class="acciones reto-cierre">
              <button type="button" class="btn primario" data-accion="guardar-reto">${estadoFinal === 'solucion' ? '[ Guardar y crear tarjeta de repaso ]' : '[ Guardar y seguir ]'}</button>
              <span class="m-sub">${reto.debate ? 'Debate: no cuenta en las estadísticas.' : `Se guarda como: ${esc(ETIQUETA_ESTADO[estadoFinal])}.`}</span>
            </div>
+           ${renderReportar(reto, true)}
          </div>`
       : '';
 
@@ -171,7 +214,7 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
     <article class="panel reto-ring">
       <header class="reto-head">
         <div>
-          <span class="lbl">Bloque ${esc(reto.bloque)} · ${esc(bloque?.titulo ?? '')} · Reto ${esc(reto.id)}</span>
+          <span class="lbl">Bloque ${esc(reto.bloque)} · ${esc(bloque?.titulo ?? '')} · ${reto.generado ? 'Generado por IA' : `Reto ${esc(reto.id)}`}</span>
           <h2 class="reto-titulo">${esc(reto.titulo)}</h2>
         </div>
         ${tagPrevio}
@@ -219,7 +262,7 @@ export function renderPanelRevision(ctx: Ctx, insp: InspeccionReto): string {
       !t.borrado &&
       (t.id === intento.tarjetaId ||
         (t.origen?.coleccion === 'intentos' && t.origen.id === intento.id) ||
-        t.anverso.includes(`[Reto ${reto.id}`)),
+        (!reto.generado && t.anverso.includes(`[Reto ${reto.id}`))),
   );
 
   const opcionesHtml = opcionesVisibles(reto)
@@ -240,7 +283,7 @@ export function renderPanelRevision(ctx: Ctx, insp: InspeccionReto): string {
       return `
         <div class="reto-opcion rev-opcion${clase}">
           <span class="op-letra">${esc(op.letra)}</span>
-          <span class="op-texto">${esc(op.texto)} ${insignia}</span>
+          <span class="op-texto">${esc(op.texto)} ${insignia}${porQue(op.porQue)}</span>
         </div>`;
     })
     .join('');
@@ -270,6 +313,7 @@ export function renderPanelRevision(ctx: Ctx, insp: InspeccionReto): string {
         <span class="lbl">Regla mental destilada</span>
         <p><b>${esc(reto.modeloMental)}</b></p>
       </div>
+      ${renderFuente(reto)}
       <div class="acciones">
         ${
           tieneTarjeta
@@ -279,6 +323,7 @@ export function renderPanelRevision(ctx: Ctx, insp: InspeccionReto): string {
         <button type="button" class="btn" data-accion="reintentar-reto" data-id="${esc(reto.id)}">[ Reintentar reto ]</button>
         <button type="button" class="btn sutil" data-accion="toggle-revision" data-id="${esc(reto.id)}">Cerrar análisis</button>
       </div>
+      ${renderReportar(reto, false)}
     </div>`;
 }
 
@@ -288,9 +333,9 @@ function resumenInspeccion({ reto, opcionElegida, acertada }: InspeccionReto): s
   return acertada ? `Resuelto (opción ${elegida})` : `Trampa detectada (elegiste ${elegida}, óptima ${esc(letraVisible(reto, reto.opcionCorrecta))})`;
 }
 
-function filaIntento(ctx: Ctx, i: Intento): string {
-  const reto = CATALOGO_RETOS.find((r) => r.id === i.ejercicio);
-  const titulo = reto ? `${reto.id} · ${reto.titulo}` : `Bloque ${i.capitulo} · Reto ${i.ejercicio}`;
+function filaIntento(ctx: Ctx, todos: readonly Reto[], i: Intento): string {
+  const reto = todos.find((r) => r.id === i.ejercicio);
+  const titulo = reto ? (reto.generado ? `${reto.titulo} (IA)` : `${reto.id} · ${reto.titulo}`) : `Bloque ${i.capitulo} · Reto ${i.ejercicio}`;
   const tarjeta = ctx.datos.tarjetas.find((t) => !t.borrado && (t.id === i.tarjetaId || (t.origen?.coleccion === 'intentos' && t.origen.id === i.id)));
   const abierto = reto ? revisionesAbiertas.has(reto.id) : false;
   const verAnalisis = reto
@@ -308,25 +353,57 @@ function filaIntento(ctx: Ctx, i: Intento): string {
     </li>`;
 }
 
+/** El intento que resulta del ring: estado deducido, letras internas (estables) y el texto libre al final. */
+function intentoDelRing(ctx: Ctx, reto: Reto, est: EstadoAcordeon, ahora: Date): Intento {
+  const estado = estadoAutomatico(reto, est.opcionInicial, est.opcionElegida, est.pistaDesbloqueada);
+  const segundos = Math.max(5, Math.round((ahora.getTime() - est.inicioMs) / 1000));
+  // Se guardan las letras internas, no las visibles. El texto libre va al final porque se lee hasta el fin.
+  const resumenJugada = [
+    `Jugada: ${est.opcionElegida || '—'} (correcta: ${reto.opcionCorrecta ?? 'debate'})`,
+    est.opcionInicial && est.opcionInicial !== est.opcionElegida ? `Inicial: ${est.opcionInicial}` : '',
+    est.respuestaLibre ? `Antes de ver opciones: ${est.respuestaLibre}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return nuevo(
+    {
+      fuenteId: ID_FUENTE_RETOS,
+      capitulo: reto.bloque,
+      ejercicio: reto.id,
+      estado,
+      segundos,
+      notaError: resumenJugada,
+      dia: ctx.hoy,
+      ...(est.confianza === null ? {} : { confianza: est.confianza }),
+    },
+    ahora,
+  );
+}
+
 export const estudio: Vista = {
   titulo: 'Retos',
   render(ctx) {
-    const fuente = fuenteRetos(ctx.ahora);
+    const todos = retosDe(ctx);
+    const fuente = fuenteRetos(ctx.ahora, retosJugables(todos));
     const intentos = ctx.datos.intentos.filter((i) => !i.borrado).sort((a, b) => b.creado.localeCompare(a.creado));
-    const contables = intentosContables(intentos);
+    const contables = intentosContables(intentos, todos);
     const desglose = desgloseResolucion(contables);
     const progreso = progresoPorCapitulo(fuente, contables);
+    // Un tema sin retos (la carrera por la AGI antes del primer generado) no aparece.
+    const bloques = BLOQUES_RETOS.filter((b) => todos.some((r) => r.bloque === b.id));
+    if (!bloques.some((b) => b.id === filtroBloque)) filtroBloque = 'todos';
+    const generados = todos.length - CATALOGO_RETOS.length;
     const reto = retoActivo(ctx);
     const est = asegurarEstado(reto);
     const estadoPrevio = estadoDeReto(reto.id, intentos);
 
     const bloquesFiltro = [
       { id: 'todos', texto: 'Todos los bloques' },
-      ...BLOQUES_RETOS.map((b) => ({ id: b.id, texto: `${b.id}. ${b.titulo}` })),
+      ...bloques.map((b) => ({ id: b.id, texto: `${b.id}. ${b.titulo}` })),
     ];
 
-    const catalogoHtml = BLOQUES_RETOS.map((b) => {
-      const retosBloque = CATALOGO_RETOS.filter((r) => r.bloque === b.id);
+    const catalogoHtml = bloques.map((b) => {
+      const retosBloque = todos.filter((r) => r.bloque === b.id);
       const prog = progreso.find((p) => p.capitulo === b.id);
       return `
         <div class="panel bloque-cat">
@@ -341,7 +418,7 @@ export const estudio: Vista = {
           <ul class="lista">
             ${retosBloque
               .map((r) => {
-                const insp = inspeccionarRetoCompletado(r.id, intentos);
+                const insp = inspeccionarRetoCompletado(r.id, intentos, todos);
                 const st = insp?.intento.estado ?? null;
                 const activo = r.id === reto.id;
                 const abierto = Boolean(insp && revisionesAbiertas.has(r.id));
@@ -350,7 +427,7 @@ export const estudio: Vista = {
                   <li class="${claseItem}" id="cat-reto-${esc(r.id)}">
                     <div class="li-fila">
                       <div class="li-main" ${insp ? `data-accion="toggle-revision" data-id="${esc(r.id)}" role="button" tabindex="0"` : ''}>
-                        <b>${esc(r.id)} · ${esc(r.titulo)} ${st ? `<span class="tag e-${st}">${esc(ETIQUETA_ESTADO[st])}</span>` : '<span class="tag">Pendiente</span>'}</b>
+                        <b>${r.generado ? '' : `${esc(r.id)} · `}${esc(r.titulo)} ${r.generado ? '<span class="tag">IA</span> ' : ''}${r.generado?.reportado ? '<span class="tag e-solucion">Erróneo</span> ' : ''}${st ? `<span class="tag e-${st}">${esc(ETIQUETA_ESTADO[st])}</span>` : '<span class="tag">Pendiente</span>'}</b>
                         ${insp ? `<span class="m-sub">${resumenInspeccion(insp)} · Clic para ${abierto ? 'ocultar' : 'inspeccionar análisis y regla'}</span>` : ''}
                       </div>
                       <div class="li-acc">
@@ -381,12 +458,12 @@ export const estudio: Vista = {
         <h2 class="sec">Siguiente reto pendiente</h2>
         ${renderAcordeon(reto, est, estadoPrevio, pideConfianza(reto, intentos))}
 
-        <h2 class="sec">Catálogo integrado (${CATALOGO_RETOS.length} retos · ${BLOQUES_RETOS.length} bloques)</h2>
+        <h2 class="sec">Todos los retos (${CATALOGO_RETOS.length} del catálogo${generados > 0 ? ` · ${generados} generados por IA` : ''})</h2>
         <p class="note">Tasa global sin ayuda: <b>${fmtPct(desglose.tasaSinAyuda)}</b> (${plural(desglose.total, 'intento registrado', 'intentos registrados')}: ${desglose.sinAyuda} sin ayuda, ${desglose.conPista} con pista, ${desglose.solucion} mirando solución). Haz clic en cualquier reto completado para desplegar su análisis, opciones y regla mental.</p>
         <div class="form-bloque">${catalogoHtml}</div>
 
         <h2 class="sec">Últimos intentos</h2>
-        ${intentos.length ? `<ul class="lista">${intentos.slice(0, 20).map((i) => filaIntento(ctx, i)).join('')}</ul>` : vacio('Aún no has completado ningún reto.')}
+        ${intentos.length ? `<ul class="lista">${intentos.slice(0, 20).map((i) => filaIntento(ctx, todos, i)).join('')}</ul>` : vacio('Aún no has completado ningún reto.')}
       </section>`;
   },
   montar(ctx, raiz) {
@@ -400,7 +477,7 @@ export const estudio: Vista = {
 
     accion(raiz, 'click', 'elegir-reto', (b) => {
       const id = b.dataset.id ?? '';
-      const buscado = CATALOGO_RETOS.find((r) => r.id === id);
+      const buscado = retosDe(ctx).find((r) => r.id === id);
       if (!buscado) return;
       estadoActual = estadoNuevo(buscado.id);
       if (ctx.sub) ctx.ir('#estudio');
@@ -424,11 +501,11 @@ export const estudio: Vista = {
 
     accion(raiz, 'click', 'crear-tarjeta-reto', async (b) => {
       const id = b.dataset.id ?? '';
-      const insp = inspeccionarRetoCompletado(id, ctx.datos.intentos);
+      const insp = inspeccionarRetoCompletado(id, ctx.datos.intentos, retosDe(ctx));
       if (!insp) return;
       const ahora = new Date();
       const { reto, intento } = insp;
-      const anverso = `[Reto ${reto.id} · ${reto.titulo}]\n${reto.escenario}`;
+      const anverso = `[${nombreReto(reto)}]\n${reto.escenario}`;
       const reverso = `${reto.modeloMental}\n\nClave: ${reto.solucion}`;
       const tarjeta = nuevaTarjeta(anverso, reverso, ahora, { coleccion: 'intentos', id: intento.id });
       await ctx.guardar(
@@ -440,11 +517,11 @@ export const estudio: Vista = {
 
     accion(raiz, 'click', 'reintentar-reto', (b) => {
       const id = b.dataset.id ?? '';
-      const reto = CATALOGO_RETOS.find((r) => r.id === id);
+      const reto = retosDe(ctx).find((r) => r.id === id);
       if (!reto) return;
       revisionesAbiertas.delete(id);
       estadoActual = estadoNuevo(reto.id);
-      ctx.avisar(`Reto ${reto.id} listo en el ring superior. Tus intentos anteriores se conservan.`);
+      ctx.avisar(`«${reto.titulo}» listo en el ring superior. Tus intentos anteriores se conservan.`);
       if (ctx.sub) ctx.ir('#estudio');
       else ctx.pintar();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -502,34 +579,12 @@ export const estudio: Vista = {
     accion(raiz, 'click', 'guardar-reto', async () => {
       const reto = retoActivo(ctx);
       const est = asegurarEstado(reto);
-      const estado = estadoAutomatico(reto, est.opcionInicial, est.opcionElegida, est.pistaDesbloqueada);
       const ahora = new Date();
-      const segundos = Math.max(5, Math.round((Date.now() - est.inicioMs) / 1000));
-      // Se guardan las letras internas (estables), no las visibles. El texto libre va al final porque se lee hasta el fin.
-      const resumenJugada = [
-        `Jugada: ${est.opcionElegida || '—'} (correcta: ${reto.opcionCorrecta ?? 'debate'})`,
-        est.opcionInicial && est.opcionInicial !== est.opcionElegida ? `Inicial: ${est.opcionInicial}` : '',
-        est.respuestaLibre ? `Antes de ver opciones: ${est.respuestaLibre}` : '',
-      ]
-        .filter(Boolean)
-        .join(' · ');
-
-      const intentoBase: Intento = nuevo(
-        {
-          fuenteId: ID_FUENTE_RETOS,
-          capitulo: reto.bloque,
-          ejercicio: reto.id,
-          estado,
-          segundos,
-          notaError: resumenJugada,
-          dia: ctx.hoy,
-          ...(est.confianza === null ? {} : { confianza: est.confianza }),
-        },
-        ahora,
-      );
+      const intentoBase = intentoDelRing(ctx, reto, est, ahora);
+      const estado = intentoBase.estado;
 
       if (estado === 'solucion') {
-        const anverso = `[Reto ${reto.id} · ${reto.titulo}]\n${reto.escenario}`;
+        const anverso = `[${nombreReto(reto)}]\n${reto.escenario}`;
         const reverso = `${reto.modeloMental}\n\nClave: ${reto.solucion}`;
         const tarjeta = nuevaTarjeta(anverso, reverso, ahora, { coleccion: 'intentos', id: intentoBase.id });
         const intentoConTarjeta: Intento = { ...intentoBase, tarjetaId: tarjeta.id };
@@ -541,7 +596,7 @@ export const estudio: Vista = {
         await ctx.guardar({ coleccion: 'intentos', registro: intentoBase });
       }
 
-      await ctx.registrar('estudio', segundos);
+      await ctx.registrar('estudio', intentoBase.segundos);
 
       const siguiente = siguienteReto(ctx);
       estadoActual = estadoNuevo(siguiente.id);
@@ -555,9 +610,29 @@ export const estudio: Vista = {
       else ctx.pintar();
     });
 
+    accion(raiz, 'submit', 'reportar-reto', async (form, e) => {
+      e.preventDefault();
+      const id = form.dataset.id ?? '';
+      const g = ctx.datos.retos.find((r) => r.id === id && !r.borrado);
+      if (!g) return;
+      const ahora = new Date();
+      const nota = (campos(form as HTMLFormElement).nota ?? '').slice(0, 300);
+      const cambios: Cambio[] = [{ coleccion: 'retos', registro: actualizar(g, { reporte: { nota, el: ahora.toISOString() } }, ahora) }];
+      // Desde el ring, la jugada se guarda (sin tarjeta: la regla puede estar mal) para que el reto cuente como jugado.
+      const reto = retoActivo(ctx);
+      const desdeElRing = estadoActual?.retoId === id && estadoActual.paso === 3 && reto.id === id;
+      if (desdeElRing && estadoActual) cambios.push({ coleccion: 'intentos', registro: intentoDelRing(ctx, reto, estadoActual, ahora) });
+      await ctx.guardar(...cambios);
+      if (desdeElRing) estadoActual = estadoNuevo(siguienteReto(ctx).id);
+      ctx.avisar('Marcado como erróneo: sale de las estadísticas y no se volverá a ofrecer.');
+      if (desdeElRing && ctx.sub) ctx.ir('#estudio');
+      else ctx.pintar();
+    });
+
     accion(raiz, 'click', 'borrar-intento', async (b) => {
       const i = ctx.datos.intentos.find((x) => x.id === b.dataset.id);
-      if (!i || !confirm(`¿Borrar el intento del reto ${i.ejercicio}?`)) return;
+      const reto = i && retosDe(ctx).find((r) => r.id === i.ejercicio);
+      if (!i || !confirm(`¿Borrar el intento de «${reto?.titulo ?? i.ejercicio}»?`)) return;
       await ctx.guardar({ coleccion: 'intentos', registro: borrar(i, new Date()) });
     });
   },
