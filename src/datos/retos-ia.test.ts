@@ -2,8 +2,8 @@ import 'fake-indexeddb/auto';
 import { describe, expect, it, vi } from 'vitest';
 import { nuevo } from '../dominio/registro';
 import { coleccionesVacias, type Colecciones, type RetoGenerado, type TemaReto } from '../dominio/tipos';
-import { Almacen } from './almacen';
-import { MAX_DESCARTES_TEMA, MAX_PETICIONES_SESION, Reponedor, pedirReto, type ResultadoReto } from './retos-ia';
+import { Almacen, type GastoRetos } from './almacen';
+import { MAX_DESCARTES_SEGUIDOS, MAX_DESCARTES_TEMA, MAX_PETICIONES_DIA, Reponedor, pedirReto, type MemoriaGasto, type ResultadoReto } from './retos-ia';
 
 const T0 = new Date('2026-10-31T10:00:00Z');
 let n = 0;
@@ -69,7 +69,22 @@ describe('Reponedor', () => {
   const generado = (tema: TemaReto, k: number): RetoGenerado =>
     nuevo({ ...propuesto, opcionCorrecta: 'A' as const, tema, titulo: `G${tema}.${k}`, modelo: 'gen/x', revision: 'ok' }, new Date(T0.getTime() + k * 1000));
 
-  function montar(respuestas: (tema: TemaReto) => ResultadoReto, reloj = () => T0.getTime()) {
+  /** Lo que el almacén guarda en `meta`: sobrevive a reabrir la app (un Reponedor nuevo). */
+  function memoriaEnLocal(): MemoriaGasto & { valor?: GastoRetos } {
+    const m: MemoriaGasto & { valor?: GastoRetos } = {
+      leer: async () => m.valor,
+      guardar: async (g) => {
+        m.valor = g;
+      },
+    };
+    return m;
+  }
+
+  function montar(
+    respuestas: (tema: TemaReto) => ResultadoReto,
+    reloj = () => T0.getTime(),
+    { memoria = memoriaEnLocal(), guardarRetos = true } = {},
+  ) {
     const datos: Colecciones = coleccionesVacias();
     const pedidos: TemaReto[] = [];
     let k = 0;
@@ -78,10 +93,10 @@ describe('Reponedor', () => {
       return respuestas(tema);
     });
     const guardar = vi.fn(async (r: RetoGenerado) => {
-      datos.retos.push(r);
+      if (guardarRetos) datos.retos.push(r);
     });
-    const reponedor = new Reponedor({ almacen: {} as Almacen, leer: () => datos, guardar, pedir: pedir as never, reloj });
-    return { reponedor, datos, pedidos, guardar, siguiente: (tema: TemaReto) => generado(tema, k++) };
+    const abrir = () => new Reponedor({ almacen: {} as Almacen, leer: () => datos, guardar, pedir: pedir as never, reloj, gasto: memoria });
+    return { reponedor: abrir(), abrir, memoria, datos, pedidos, guardar, siguiente: (tema: TemaReto) => generado(tema, k++) };
   }
 
   it('llena un reto por tema, de uno en uno, empezando por la carrera por la AGI', async () => {
@@ -104,6 +119,8 @@ describe('Reponedor', () => {
       leer: () => datos,
       guardar: async (r) => { datos.retos.push(r); },
       pedir: (async (_a: Almacen, tema: TemaReto) => ({ tipo: 'ok', reto: generado(tema, k++) })) as never,
+      reloj: () => T0.getTime(),
+      gasto: memoriaEnLocal(),
       alCambiarEstado: () => vistos.push(reponedor.estado),
     });
     await reponedor.reponer();
@@ -125,10 +142,47 @@ describe('Reponedor', () => {
     expect(m.datos.retos.map((r) => r.tema)).toEqual(['1', '2', '3', '4']);
   });
 
-  it(`no pasa de ${MAX_PETICIONES_SESION} peticiones por sesión`, async () => {
-    const m = montar(() => ({ tipo: 'descartado', mensaje: 'no' }));
+  it(`tras ${MAX_DESCARTES_SEGUIDOS} descartes seguidos para hasta mañana (UTC), aunque se reabra la app`, async () => {
+    let ahora = T0.getTime();
+    let r: (tema: TemaReto) => ResultadoReto = () => ({ tipo: 'descartado', mensaje: 'Reto descartado (formato): Falta «escenario».' });
+    const m = montar((tema) => r(tema), () => ahora);
     await m.reponedor.reponer();
-    expect(m.pedidos).toHaveLength(MAX_PETICIONES_SESION);
+    expect(m.pedidos).toEqual(['5', '5', '1']);
+    expect(m.reponedor.estado).toContain('Falta «escenario»');
+    expect(m.reponedor.estado).toContain('hasta mañana');
+    // Reabrir la app no reinicia el tope: el estado (con el último motivo) se ve sin gastar nada.
+    const reabierto = m.abrir();
+    await reabierto.reponer();
+    expect(m.pedidos).toHaveLength(3);
+    expect(reabierto.estado).toContain('Falta «escenario»');
+    // Al día siguiente vuelve a intentarlo.
+    ahora = Date.UTC(2026, 10, 1, 0, 0, 1);
+    r = (tema) => ({ tipo: 'ok', reto: m.siguiente(tema) });
+    await m.abrir().reponer();
+    expect(m.datos.retos).toHaveLength(5);
+  });
+
+  it(`no pasa de ${MAX_PETICIONES_DIA} peticiones al día por dispositivo, aunque se reabra la app`, async () => {
+    let ahora = T0.getTime();
+    // Retos que no llegan a guardarse: el tema sigue vacío y el reponedor querría pedir sin fin.
+    const m = montar((tema) => ({ tipo: 'ok', reto: m.siguiente(tema) }), () => ahora, { guardarRetos: false });
+    await m.reponedor.reponer();
+    expect(m.pedidos).toHaveLength(MAX_PETICIONES_DIA);
+    await m.abrir().reponer();
+    expect(m.pedidos).toHaveLength(MAX_PETICIONES_DIA);
+    expect(m.memoria.valor).toMatchObject({ dia: '2026-10-31', peticiones: MAX_PETICIONES_DIA, descartesSeguidos: 0 });
+    ahora = Date.UTC(2026, 10, 1, 9, 0, 0);
+    await m.abrir().reponer();
+    expect(m.pedidos).toHaveLength(2 * MAX_PETICIONES_DIA);
+  });
+
+  it('un reto generado reinicia la cuenta de descartes seguidos', async () => {
+    // 5: descarte y generado; 1: dos descartes (se salta); 2, 3 y 4: generados. Sin el reinicio, serían tres seguidos.
+    const resultados: (ResultadoReto | null)[] = [{ tipo: 'descartado', mensaje: 'revisor' }, null, { tipo: 'descartado', mensaje: 'revisor' }, { tipo: 'descartado', mensaje: 'revisor' }];
+    const m = montar((tema) => resultados.shift() ?? { tipo: 'ok', reto: m.siguiente(tema) });
+    await m.reponedor.reponer();
+    expect(m.pedidos).toEqual(['5', '5', '1', '1', '2', '3', '4']);
+    expect(m.memoria.valor).toMatchObject({ peticiones: 7, descartesSeguidos: 0 });
   });
 
   it('con el cupo agotado espera al día siguiente (UTC)', async () => {
@@ -161,10 +215,11 @@ describe('Reponedor', () => {
     expect(m.pedidos).toHaveLength(4);
   });
 
-  it('sin clave no gasta peticiones de la sesión', async () => {
+  it('lo que no llega al modelo (sin clave, sin red, cupo) no gasta peticiones del día', async () => {
     let conClave = false;
     const m = montar((tema) => (conClave ? { tipo: 'ok', reto: m.siguiente(tema) } : { tipo: 'parar', motivo: 'sin-token', mensaje: 'Sin clave' }));
-    for (let i = 0; i < MAX_PETICIONES_SESION + 2; i++) await m.reponedor.reponer();
+    for (let i = 0; i < MAX_PETICIONES_DIA + 2; i++) await m.reponedor.reponer();
+    expect(m.memoria.valor).toBeUndefined();
     conClave = true;
     await m.reponedor.reponer();
     expect(m.datos.retos).toHaveLength(5);

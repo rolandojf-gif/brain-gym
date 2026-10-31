@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Almacen } from '../src/datos/almacen';
 import { ErrorDeIa, auditarConIa } from '../src/datos/ia';
 import { MAX_CARACTERES_IA, SYSTEM_PROMPT_ABOGADO_DIABLO } from '../src/dominio/ia';
-import { MAX_LLAMADAS_IA_DIA } from '../src/dominio/retos-ia';
+import { MAX_LLAMADAS_IA_DIA, MAX_LLAMADAS_RETOS_DIA } from '../src/dominio/retos-ia';
 
 /* Netlify Blobs en memoria para el cupo diario de IA, con escritura condicional como el real. */
 const blobs = vi.hoisted(() => {
@@ -134,6 +134,10 @@ describe('/api/ia', () => {
     );
     expect((await handler(peticion(cuerpoValido))).status).toBe(200);
     expect(blobs.m.valor).toMatchObject({ usadas: 1 });
+
+    // Lo que los retos no pueden tocar sigue disponible para el Abogado del Diablo.
+    blobs.m.valor = { dia: new Date().toISOString().slice(0, 10), usadas: MAX_LLAMADAS_RETOS_DIA };
+    expect((await handler(peticion(cuerpoValido))).status).toBe(200);
 
     blobs.m.valor = { dia: new Date().toISOString().slice(0, 10), usadas: MAX_LLAMADAS_IA_DIA };
     spy.mockClear();

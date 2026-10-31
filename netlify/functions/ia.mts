@@ -10,7 +10,7 @@ import {
   validarPeticionIa,
   type PeticionIa,
 } from '../../src/dominio/ia';
-import { ErrorServidor, autorizado, consumirCupo, json, leerEnv, llamarOpenRouter } from '../servidor';
+import { ErrorServidor, autorizado, json, leerEnv, llamarConCupo } from '../servidor';
 
 export default async (req: Request): Promise<Response> => {
   if (req.method !== 'POST') return json({ error: 'Método no permitido' }, 405);
@@ -38,8 +38,7 @@ export default async (req: Request): Promise<Response> => {
   const model = leerEnv('OPENROUTER_MODEL') ?? MODELO_IA_POR_DEFECTO;
   try {
     if (!leerEnv('OPENROUTER_API_KEY')) throw new ErrorServidor(500, 'Falta configurar OPENROUTER_API_KEY en el servidor de Netlify');
-    await consumirCupo();
-    const texto = await llamarOpenRouter(construirPayloadOpenRouter(model, peticion));
+    const { texto } = await llamarConCupo(construirPayloadOpenRouter(model, peticion));
     try {
       return json(parsearRespuestaIa(texto), 200);
     } catch (e) {

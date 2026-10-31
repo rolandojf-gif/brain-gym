@@ -3,7 +3,7 @@
 import { getStore } from '@netlify/blobs';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { extraerContenidoOpenRouter } from '../src/dominio/ia';
-import { MAX_LLAMADAS_IA_DIA, reservarCupo, type Cupo } from '../src/dominio/retos-ia';
+import { MAX_LLAMADAS_IA_DIA, MAX_LLAMADAS_RETOS_DIA, RESERVA_ABOGADO, reservarCupo, type Cupo } from '../src/dominio/retos-ia';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const CLAVE_CUPO = 'cupo-ia';
@@ -34,7 +34,12 @@ export function json(cuerpo: unknown, status = 200): Response {
 /** Error con el código HTTP que debe devolver la función. */
 export class ErrorServidor extends Error {
   override name = 'ErrorServidor';
-  constructor(public readonly status: number, mensaje: string) {
+  constructor(
+    public readonly status: number,
+    mensaje: string,
+    /** OpenRouter rechazó la llamada sin generar nada (modelo inexistente, clave mala, sin red): no ha costado. */
+    public readonly sinGenerar = false,
+  ) {
     super(mensaje);
   }
 }
@@ -61,7 +66,7 @@ export async function llamarOpenRouterConFin(payload: Record<string, unknown>): 
       body: JSON.stringify(payload),
     });
   } catch (e) {
-    throw new ErrorServidor(502, `Error de red al conectar con OpenRouter (modelo: ${model}): ${e instanceof Error ? e.message : 'fallo de conexión'}`);
+    throw new ErrorServidor(502, `Error de red al conectar con OpenRouter (modelo: ${model}): ${e instanceof Error ? e.message : 'fallo de conexión'}`, true);
   }
 
   const cuerpoTexto = await res.text().catch(() => '');
@@ -75,7 +80,7 @@ export async function llamarOpenRouterConFin(payload: Record<string, unknown>): 
   }
   if (!res.ok) {
     const detalle = (cuerpoJson ? extraerContenidoOpenRouter(cuerpoJson).errorDetalle : '') || cuerpoTexto.slice(0, 240) || 'sin detalle adicional';
-    throw new ErrorServidor(502, `OpenRouter HTTP ${res.status} (modelo: ${model}): ${detalle}`);
+    throw new ErrorServidor(502, `OpenRouter HTTP ${res.status} (modelo: ${model}): ${detalle}`, true);
   }
   const { texto, finishReason, errorDetalle } = extraerContenidoOpenRouter(cuerpoJson);
   if (errorDetalle) throw new ErrorServidor(502, `OpenRouter error (modelo: ${model}): ${errorDetalle}`);
@@ -88,21 +93,53 @@ export async function llamarOpenRouterConFin(payload: Record<string, unknown>): 
   return { texto, ...(finishReason ? { finishReason } : {}) };
 }
 
+/** Hasta dónde puede llenar el cupo diario cada función, y qué se dice al llegar. */
+export interface LimiteCupo {
+  max: number;
+  mensaje: string;
+}
+
+export const LIMITE_GENERAL: LimiteCupo = {
+  max: MAX_LLAMADAS_IA_DIA,
+  mensaje: `Tope diario de ${MAX_LLAMADAS_IA_DIA} llamadas a la IA alcanzado. Vuelve mañana.`,
+};
+
+/* Los retos se piden solos y en segundo plano: si algo falla en bucle, no pueden dejar sin Abogado del Diablo. */
+export const LIMITE_RETOS: LimiteCupo = {
+  max: MAX_LLAMADAS_RETOS_DIA,
+  mensaje: `Los retos generados ya han usado hoy sus ${MAX_LLAMADAS_RETOS_DIA} llamadas a la IA; las otras ${RESERVA_ABOGADO} quedan para el Abogado del Diablo. Vuelve mañana.`,
+};
+
 /**
- * Reserva `n` llamadas a la IA del cupo diario (UTC), compartido por todas las funciones. Escritura condicional en
- * Netlify Blobs para que dos peticiones simultáneas no cuenten de menos. Lanza 429 si no caben.
+ * Reserva `n` llamadas a la IA del cupo diario (UTC), compartido por todas las funciones; con `n` negativo las
+ * devuelve. Escritura condicional en Netlify Blobs para que dos peticiones simultáneas no cuenten de menos. Lanza
+ * 429 si no caben dentro del límite de quien pide.
  */
-export async function consumirCupo(n = 1, ahora = new Date()): Promise<void> {
+export async function consumirCupo(n = 1, limite = LIMITE_GENERAL, ahora = new Date()): Promise<void> {
   const store = getStore({ name: 'brain-gym', consistency: 'strong' });
   const dia = ahora.toISOString().slice(0, 10);
   for (let i = 0; i < 5; i++) {
     const guardado = await store.getWithMetadata(CLAVE_CUPO, { type: 'json' });
-    const nuevo = reservarCupo((guardado?.data as Cupo | undefined) ?? null, dia, n);
-    if (!nuevo) throw new ErrorServidor(429, `Tope diario de ${MAX_LLAMADAS_IA_DIA} llamadas a la IA alcanzado. Vuelve mañana.`);
+    const nuevo = reservarCupo((guardado?.data as Cupo | undefined) ?? null, dia, n, limite.max);
+    if (!nuevo) throw new ErrorServidor(429, limite.mensaje);
     const escrito = guardado?.etag
       ? await store.setJSON(CLAVE_CUPO, nuevo, { onlyIfMatch: guardado.etag })
       : await store.setJSON(CLAVE_CUPO, nuevo, { onlyIfNew: true });
     if (escrito.modified) return;
   }
   throw new ErrorServidor(409, 'No se pudo reservar el cupo de IA; vuelve a intentarlo.');
+}
+
+/**
+ * Reserva una llamada del cupo y llama a OpenRouter. Si OpenRouter la rechaza sin generar nada, la devuelve: un
+ * modelo mal configurado no cuesta y no debe agotar el día.
+ */
+export async function llamarConCupo(payload: Record<string, unknown>, limite = LIMITE_GENERAL): Promise<{ texto: string; finishReason?: string }> {
+  await consumirCupo(1, limite);
+  try {
+    return await llamarOpenRouterConFin(payload);
+  } catch (e) {
+    if (e instanceof ErrorServidor && e.sinGenerar) await consumirCupo(-1, limite).catch(() => undefined);
+    throw e;
+  }
 }

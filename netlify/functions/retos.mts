@@ -1,7 +1,7 @@
 /* /api/retos: genera un reto con IA sobre un tema. Un intento por petición: generar → validar → comprobar que la
    fuente responde → revisar con una segunda llamada. Si algo falla responde 422 con el motivo y la app vuelve a pedir
    más tarde (los retos se generan en segundo plano, así que no hace falta reintentar aquí y alargar la petición).
-   Cada petición gasta como mucho dos llamadas del cupo diario de IA. */
+   Cada petición gasta como mucho dos llamadas de las que el cupo diario de IA deja a los retos (LIMITE_RETOS). */
 import type { Config } from '@netlify/functions';
 import { MODELO_IA_POR_DEFECTO } from '../../src/dominio/ia';
 import {
@@ -15,7 +15,7 @@ import {
   validarPeticionReto,
   type PeticionReto,
 } from '../../src/dominio/retos-ia';
-import { ErrorServidor, autorizado, consumirCupo, json, leerEnv, llamarOpenRouterConFin } from '../servidor';
+import { ErrorServidor, LIMITE_RETOS, autorizado, json, leerEnv, llamarConCupo } from '../servidor';
 
 const MAX_CUERPO = 8000;
 const TIEMPO_FUENTE_MS = 6000;
@@ -38,8 +38,7 @@ export default async (req: Request): Promise<Response> => {
   const revisor = leerEnv('OPENROUTER_MODEL_REVISOR') ?? model;
   try {
     if (!leerEnv('OPENROUTER_API_KEY')) throw new ErrorServidor(500, 'Falta configurar OPENROUTER_API_KEY en el servidor de Netlify');
-    await consumirCupo();
-    const generado = await llamarOpenRouterConFin(payloadGenerar(model, peticion));
+    const generado = await llamarConCupo(payloadGenerar(model, peticion), LIMITE_RETOS);
     // Cortada por longitud, lo que llega puede ser el razonamiento del modelo y no el reto: no se intenta leer.
     if (generado.finishReason === 'length') return descartado('formato', `la respuesta de ${model} se cortó al llegar a ${MAX_TOKENS_GENERAR} tokens`);
     let reto;
@@ -52,8 +51,7 @@ export default async (req: Request): Promise<Response> => {
     const fuente = await comprobarFuente(reto.fuente.url);
     if (!fuente.ok) return descartado('fuente', `la fuente no responde (${fuente.detalle}): ${reto.fuente.url}`);
 
-    await consumirCupo();
-    const respuestaRevisor = await llamarOpenRouterConFin(payloadRevisar(revisor, reto));
+    const respuestaRevisor = await llamarConCupo(payloadRevisar(revisor, reto), LIMITE_RETOS);
     if (respuestaRevisor.finishReason === 'length') return descartado('revisor', `la respuesta de ${revisor} se cortó al llegar a ${MAX_TOKENS_REVISAR} tokens`);
     const revision = parsearRevision(respuestaRevisor.texto);
     if (!revision.aprobado) return descartado('revisor', revision.motivo);

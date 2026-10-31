@@ -156,4 +156,9 @@ describe('cupo diario', () => {
     expect(reservarCupo({ dia: '2026-10-31', usadas: MAX_LLAMADAS_IA_DIA }, '2026-10-31')).toBeNull();
     expect(reservarCupo({ dia: '2026-10-31', usadas: MAX_LLAMADAS_IA_DIA - 1 }, '2026-10-31', 2)).toBeNull();
   });
+  it('devuelve llamadas con n negativo, también con el tope lleno, sin bajar de cero', () => {
+    expect(reservarCupo({ dia: '2026-10-31', usadas: MAX_LLAMADAS_IA_DIA }, '2026-10-31', -1)).toEqual({ dia: '2026-10-31', usadas: MAX_LLAMADAS_IA_DIA - 1 });
+    // Si el día cambió entre reservar y devolver, el día nuevo empieza en cero y se queda en cero.
+    expect(reservarCupo({ dia: '2026-10-30', usadas: 5 }, '2026-10-31', -1)).toEqual({ dia: '2026-10-31', usadas: 0 });
+  });
 });

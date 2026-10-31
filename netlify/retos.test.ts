@@ -1,6 +1,6 @@
 /* Tests de /api/retos (fuera de netlify/functions: Netlify publicaría como función cualquier archivo de esa carpeta). */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MAX_LLAMADAS_IA_DIA, SYSTEM_PROMPT_GENERAR, SYSTEM_PROMPT_REVISAR } from '../src/dominio/retos-ia';
+import { MAX_LLAMADAS_RETOS_DIA, SYSTEM_PROMPT_GENERAR, SYSTEM_PROMPT_REVISAR } from '../src/dominio/retos-ia';
 
 /* Netlify Blobs en memoria (para el cupo), con escritura condicional como el real. */
 const blobs = vi.hoisted(() => {
@@ -139,12 +139,29 @@ describe('/api/retos', () => {
     expect(await res.json()).toMatchObject({ motivo: 'revisor', error: expect.stringContaining('B y C son defendibles.') });
   });
 
-  it('con el cupo diario agotado responde 429 sin llamar a OpenRouter', async () => {
-    blobs.m.valor = { dia: new Date().toISOString().slice(0, 10), usadas: MAX_LLAMADAS_IA_DIA };
+  it('al llegar a su parte del cupo responde 429 sin llamar a OpenRouter (el resto queda para el Abogado del Diablo)', async () => {
+    blobs.m.valor = { dia: new Date().toISOString().slice(0, 10), usadas: MAX_LLAMADAS_RETOS_DIA };
     const spy = simular([JSON.stringify(reto)]);
     const res = await handler(peticion({ tema: '1' }));
     expect(res.status).toBe(429);
+    expect(((await res.json()) as { error: string }).error).toContain('Abogado del Diablo');
     expect(llamadasOpenRouter(spy)).toHaveLength(0);
+  });
+
+  it('una llamada que OpenRouter rechaza sin generar (modelo inexistente) no gasta cupo', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: 'anthropic/claude-3.5-sonnet is no longer available', code: 404 } }), { status: 404 }),
+    );
+    const res = await handler(peticion({ tema: '1' }));
+    expect(res.status).toBe(502);
+    expect(((await res.json()) as { error: string }).error).toContain('HTTP 404');
+    expect(blobs.m.valor).toMatchObject({ usadas: 0 });
+  });
+
+  it('una respuesta con formato inválido sí gasta su llamada: el modelo la generó', async () => {
+    simular(['{"titulo": "sin lo demás"}']);
+    expect((await handler(peticion({ tema: '1' }))).status).toBe(422);
+    expect(blobs.m.valor).toMatchObject({ usadas: 1 });
   });
 
   it('sin OPENROUTER_API_KEY responde 500 sin gastar cupo', async () => {
