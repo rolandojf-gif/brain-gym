@@ -41,6 +41,14 @@ export class ErrorServidor extends Error {
 
 /** Llama a OpenRouter y devuelve el texto de la respuesta. Los errores llevan el código, el modelo y el detalle real. */
 export async function llamarOpenRouter(payload: Record<string, unknown>): Promise<string> {
+  return (await llamarOpenRouterConFin(payload)).texto;
+}
+
+/**
+ * Como `llamarOpenRouter`, pero con el `finish_reason`: «length» significa que la respuesta se cortó por max_tokens
+ * (y el texto puede ser el razonamiento del modelo, no la respuesta).
+ */
+export async function llamarOpenRouterConFin(payload: Record<string, unknown>): Promise<{ texto: string; finishReason?: string }> {
   const apiKey = leerEnv('OPENROUTER_API_KEY');
   if (!apiKey) throw new ErrorServidor(500, 'Falta configurar OPENROUTER_API_KEY en el servidor de Netlify');
   const model = String(payload.model);
@@ -77,7 +85,7 @@ export async function llamarOpenRouter(payload: Record<string, unknown>): Promis
       `La respuesta del modelo llegó vacía desde OpenRouter (HTTP ${res.status}, modelo: ${model}, finish_reason: ${finishReason ?? 'sin indicar'}). Revisa si el ID de OPENROUTER_MODEL es válido.`,
     );
   }
-  return texto;
+  return { texto, ...(finishReason ? { finishReason } : {}) };
 }
 
 /**

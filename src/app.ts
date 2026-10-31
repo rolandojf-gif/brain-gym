@@ -62,6 +62,10 @@ export class App {
       almacen,
       leer: () => this.datos,
       guardar: (reto) => this.guardarDeFondo({ coleccion: 'retos', registro: reto }),
+      // Sólo se repinta en Datos, donde se ve el estado; en el resto, lo nuevo aparece en el siguiente pintado.
+      alCambiarEstado: () => {
+        if (location.hash.startsWith('#datos')) this.alCambiar();
+      },
     });
   }
 

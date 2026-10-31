@@ -6,6 +6,8 @@ import type { Config } from '@netlify/functions';
 import { MODELO_IA_POR_DEFECTO } from '../../src/dominio/ia';
 import {
   ErrorRetoIa,
+  MAX_TOKENS_GENERAR,
+  MAX_TOKENS_REVISAR,
   parsearRetoGenerado,
   parsearRevision,
   payloadGenerar,
@@ -13,7 +15,7 @@ import {
   validarPeticionReto,
   type PeticionReto,
 } from '../../src/dominio/retos-ia';
-import { ErrorServidor, autorizado, consumirCupo, json, leerEnv, llamarOpenRouter } from '../servidor';
+import { ErrorServidor, autorizado, consumirCupo, json, leerEnv, llamarOpenRouterConFin } from '../servidor';
 
 const MAX_CUERPO = 8000;
 const TIEMPO_FUENTE_MS = 6000;
@@ -37,19 +39,23 @@ export default async (req: Request): Promise<Response> => {
   try {
     if (!leerEnv('OPENROUTER_API_KEY')) throw new ErrorServidor(500, 'Falta configurar OPENROUTER_API_KEY en el servidor de Netlify');
     await consumirCupo();
-    const generado = await llamarOpenRouter(payloadGenerar(model, peticion));
+    const generado = await llamarOpenRouterConFin(payloadGenerar(model, peticion));
+    // Cortada por longitud, lo que llega puede ser el razonamiento del modelo y no el reto: no se intenta leer.
+    if (generado.finishReason === 'length') return descartado('formato', `la respuesta de ${model} se cortó al llegar a ${MAX_TOKENS_GENERAR} tokens`);
     let reto;
     try {
-      reto = parsearRetoGenerado(generado, peticion.tema);
+      reto = parsearRetoGenerado(generado.texto, peticion.tema);
     } catch (e) {
-      return descartado('formato', e instanceof Error ? e.message : 'formato inválido');
+      return descartado('formato', `${e instanceof Error ? e.message : 'formato inválido'} (modelo: ${model})`);
     }
 
     const fuente = await comprobarFuente(reto.fuente.url);
     if (!fuente.ok) return descartado('fuente', `la fuente no responde (${fuente.detalle}): ${reto.fuente.url}`);
 
     await consumirCupo();
-    const revision = parsearRevision(await llamarOpenRouter(payloadRevisar(revisor, reto)));
+    const respuestaRevisor = await llamarOpenRouterConFin(payloadRevisar(revisor, reto));
+    if (respuestaRevisor.finishReason === 'length') return descartado('revisor', `la respuesta de ${revisor} se cortó al llegar a ${MAX_TOKENS_REVISAR} tokens`);
+    const revision = parsearRevision(respuestaRevisor.texto);
     if (!revision.aprobado) return descartado('revisor', revision.motivo);
 
     return json({ reto: { ...reto, modelo: model, revision: revision.motivo } });

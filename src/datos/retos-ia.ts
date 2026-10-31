@@ -1,7 +1,7 @@
 /* Retos generados en segundo plano: pide a /api/retos uno por tema hasta tener uno listo en cada uno. Nunca bloquea
    ni repinta: lo nuevo aparece en el siguiente pintado. Va de uno en uno y con topes por sesión, porque cada petición
    gasta una o dos llamadas del cupo diario de IA. */
-import { temasPorReponer, todosLosRetos, vistosDeTema } from '../dominio/catalogo-retos';
+import { BLOQUES_RETOS, temasPorReponer, todosLosRetos, vistosDeTema } from '../dominio/catalogo-retos';
 import { nuevo } from '../dominio/registro';
 import { validarRetoPropuesto } from '../dominio/retos-ia';
 import type { Colecciones, RetoGenerado, TemaReto } from '../dominio/tipos';
@@ -72,17 +72,29 @@ export interface DepsReponedor {
   guardar: (reto: RetoGenerado) => Promise<void>;
   pedir?: typeof pedirReto;
   reloj?: () => number;
+  /** Se llama cada vez que cambia `estado`, para que la pestaña Datos lo muestre en vivo. */
+  alCambiarEstado?: () => void;
 }
 
 export class Reponedor {
   /** Última novedad, en una línea, para la pestaña Datos. */
-  estado = '';
+  private estadoActual = '';
   private enCurso: Promise<void> | null = null;
   private peticiones = 0;
   private descartes = new Map<TemaReto, number>();
   private pausaHasta = 0;
 
   constructor(private readonly deps: DepsReponedor) {}
+
+  get estado(): string {
+    return this.estadoActual;
+  }
+
+  private set estado(texto: string) {
+    if (texto === this.estadoActual) return;
+    this.estadoActual = texto;
+    this.deps.alCambiarEstado?.();
+  }
 
   /** Repone lo que falte. Si ya está reponiendo, devuelve la misma promesa. */
   reponer(): Promise<void> {
@@ -107,6 +119,8 @@ export class Reponedor {
       const retos = todosLosRetos(datos.retos);
       const tema = temasPorReponer(retos, datos.intentos).find((t) => (this.descartes.get(t) ?? 0) < MAX_DESCARTES_TEMA);
       if (!tema) return;
+      // Cada petición tarda decenas de segundos (generar, comprobar la fuente, revisar): que se vea que trabaja.
+      this.estado = `Pidiendo un reto de ${BLOQUES_RETOS.find((b) => b.id === tema)?.titulo ?? `tema ${tema}`}…`;
       const r = await pedir(this.deps.almacen, tema, vistosDeTema(tema, retos));
       if (r.tipo === 'parar' && r.motivo === 'sin-token') {
         this.estado = r.mensaje;

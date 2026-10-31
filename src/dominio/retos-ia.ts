@@ -3,8 +3,10 @@
 import { extraerSubcadenaJson } from './ia';
 import type { LetraOpcion, RetoGenerado, TemaReto } from './tipos';
 
-export const MAX_TOKENS_GENERAR = 2200;
-export const MAX_TOKENS_REVISAR = 400;
+/* Holgados a propósito: en los modelos que razonan antes de responder, el razonamiento también gasta de aquí, y una
+   respuesta cortada se pierde entera. Con modelos «flash» el coste es despreciable. */
+export const MAX_TOKENS_GENERAR = 4000;
+export const MAX_TOKENS_REVISAR = 1200;
 /** Tope de llamadas a la IA por día (UTC) entre todas las funciones: limita el gasto si algo entra en bucle. */
 export const MAX_LLAMADAS_IA_DIA = 40;
 /** Con cuatro opciones, la correcta no puede ser mucho más larga que la distractora más larga: delataría la respuesta. */
@@ -141,26 +143,79 @@ export function urlFuenteValida(url: string): boolean {
   return true;
 }
 
+type Objeto = Record<string, unknown>;
+
+const esObjeto = (v: unknown): v is Objeto => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** Clave sin tildes, mayúsculas ni separadores: «porQue», «por_qué» y «PorQue» son la misma. */
+const normalizar = (k: string): string => k.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, '');
+
+/* Nombres alternativos que usan los modelos aunque el prompt fije las claves. Tolerarlos cuesta poco; lo que importa
+   (una sola respuesta defendible, una fuente real) lo comprueban la validación y el revisor. */
+const ALIAS: Record<string, readonly string[]> = {
+  titulo: ['titulo', 'title', 'nombre'],
+  escenario: ['escenario', 'situacion', 'planteamiento', 'enunciado', 'contexto', 'caso', 'problema', 'scenario', 'pregunta'],
+  opciones: ['opciones', 'options', 'alternativas', 'respuestas'],
+  id: ['id', 'letra', 'letter'],
+  texto: ['texto', 'text', 'opcion', 'descripcion', 'contenido'],
+  porQue: ['porque', 'explicacion', 'justificacion', 'razon', 'motivo', 'why', 'explanation'],
+  opcionCorrecta: ['opcioncorrecta', 'correcta', 'respuestacorrecta', 'correct', 'correctoption', 'answer', 'solucioncorrecta'],
+  pista: ['pista', 'hint'],
+  solucion: ['solucion', 'resolucion', 'solution', 'explicacionsolucion'],
+  modeloMental: ['modelomental', 'regla', 'reglamental', 'mentalmodel'],
+  fuente: ['fuente', 'source', 'referencia', 'reference'],
+  url: ['url', 'enlace', 'link', 'href'],
+};
+
+/** Valor de un campo por su nombre o sus alias. Distingue «no está» (undefined) de un `null` explícito. */
+function campo(o: Objeto, nombre: keyof typeof ALIAS): unknown {
+  const buscados = ALIAS[nombre] ?? [normalizar(nombre)];
+  for (const [k, v] of Object.entries(o)) if (buscados.includes(normalizar(k))) return v;
+  return undefined;
+}
+
+/** Algunos modelos envuelven la respuesta: {"reto": {...}}. Si el objeto no trae el reto pero un hijo sí, se usa el hijo. */
+function desenvolver(o: Objeto): Objeto {
+  const traeReto = (x: Objeto) => campo(x, 'escenario') !== undefined || campo(x, 'opciones') !== undefined;
+  if (traeReto(o)) return o;
+  return Object.values(o).filter(esObjeto).find(traeReto) ?? o;
+}
+
 /** Valida y normaliza la salida del generador. Lanza ErrorRetoIa con el motivo si no sirve. */
 export function validarRetoPropuesto(entrada: unknown, tema: TemaReto): RetoPropuesto {
-  if (typeof entrada !== 'object' || entrada === null || Array.isArray(entrada)) throw new ErrorRetoIa('El reto no es un objeto.');
-  const r = entrada as Record<string, unknown>;
-  const titulo = texto(r.titulo, 'titulo', 140);
-  const escenario = texto(r.escenario, 'escenario', 1400);
-  if (!Array.isArray(r.opciones) || r.opciones.length !== 4) throw new ErrorRetoIa('Hacen falta exactamente 4 opciones.');
+  if (!esObjeto(entrada)) throw new ErrorRetoIa('El reto no es un objeto.');
+  const r = desenvolver(entrada);
+  try {
+    return validarCampos(r, tema);
+  } catch (e) {
+    // Con las claves recibidas a la vista se sabe si el modelo renombró un campo o se quedó a medias.
+    if (e instanceof ErrorRetoIa && e.message.startsWith('Falta')) {
+      throw new ErrorRetoIa(`${e.message} Claves recibidas: ${Object.keys(r).join(', ') || 'ninguna'}.`);
+    }
+    throw e;
+  }
+}
+
+function validarCampos(r: Objeto, tema: TemaReto): RetoPropuesto {
+  const titulo = texto(campo(r, 'titulo'), 'titulo', 140);
+  const escenario = texto(campo(r, 'escenario'), 'escenario', 1400);
+  const lista = campo(r, 'opciones');
+  if (!Array.isArray(lista) || lista.length !== 4) throw new ErrorRetoIa('Hacen falta exactamente 4 opciones.');
   // Sin ids, la posición decide la letra; con ids, deben ser A–D sin repetir (el orden da igual: la app baraja).
-  const crudas = r.opciones.map((o) => (typeof o === 'object' && o !== null ? o : {}) as Record<string, unknown>);
-  const conId = crudas.every((o) => o.id !== undefined);
-  if (conId && new Set(crudas.map((o) => o.id)).size !== 4) throw new ErrorRetoIa('Los ids de las opciones se repiten.');
+  const crudas = lista.map((o) => (esObjeto(o) ? o : {}));
+  const ids = crudas.map((o) => campo(o, 'id'));
+  const conId = ids.every((id) => id !== undefined);
+  if (conId && new Set(ids.map((id) => String(id).trim().toUpperCase())).size !== 4) throw new ErrorRetoIa('Los ids de las opciones se repiten.');
   const opciones = crudas
     .map((op, i) => {
-      const id = (conId ? op.id : LETRAS[i]) as LetraOpcion;
+      const id = (conId ? String(ids[i]).trim().toUpperCase() : LETRAS[i]) as LetraOpcion;
       if (!LETRAS.includes(id)) throw new ErrorRetoIa('Los ids de las opciones deben ser A, B, C y D.');
-      return { id, texto: texto(op.texto, `opción ${id}`, 400), porQue: texto(op.porQue, `porQue de ${id}`, 500) };
+      return { id, texto: texto(campo(op, 'texto'), `opción ${id}`, 400), porQue: texto(campo(op, 'porQue'), `porQue de ${id}`, 500) };
     })
     .sort((a, b) => a.id.localeCompare(b.id));
   if (new Set(opciones.map((o) => o.texto.toLowerCase())).size !== 4) throw new ErrorRetoIa('Hay opciones repetidas.');
-  const correcta = r.opcionCorrecta;
+  const crudaCorrecta = campo(r, 'opcionCorrecta');
+  const correcta = typeof crudaCorrecta === 'string' ? crudaCorrecta.trim().toUpperCase() : (crudaCorrecta ?? null);
   if (correcta !== null && !LETRAS.includes(correcta as LetraOpcion)) throw new ErrorRetoIa('«opcionCorrecta» debe ser A, B, C, D o null.');
   const opcionCorrecta = correcta as LetraOpcion | null;
   if (opcionCorrecta) {
@@ -168,8 +223,9 @@ export function validarRetoPropuesto(entrada: unknown, tema: TemaReto): RetoProp
     const maxOtra = Math.max(...opciones.filter((o) => o.id !== opcionCorrecta).map((o) => o.texto.length));
     if (larga > RATIO_MAX_LONGITUD * maxOtra) throw new ErrorRetoIa('La opción correcta es mucho más larga que las demás: delataría la respuesta.');
   }
-  const f = (typeof r.fuente === 'object' && r.fuente !== null ? r.fuente : {}) as Record<string, unknown>;
-  const fuente = { titulo: texto(f.titulo, 'fuente.titulo', 200), url: texto(f.url, 'fuente.url', 500) };
+  const crudaFuente = campo(r, 'fuente');
+  const f = esObjeto(crudaFuente) ? crudaFuente : {};
+  const fuente = { titulo: texto(campo(f, 'titulo'), 'fuente.titulo', 200), url: texto(campo(f, 'url'), 'fuente.url', 500) };
   if (!urlFuenteValida(fuente.url)) throw new ErrorRetoIa('La URL de la fuente no es una dirección https pública.');
   return {
     tema,
@@ -177,9 +233,9 @@ export function validarRetoPropuesto(entrada: unknown, tema: TemaReto): RetoProp
     escenario,
     opciones,
     opcionCorrecta,
-    pista: texto(r.pista, 'pista', 400),
-    solucion: texto(r.solucion, 'solucion', 2000),
-    modeloMental: texto(r.modeloMental, 'modeloMental', 300),
+    pista: texto(campo(r, 'pista'), 'pista', 400),
+    solucion: texto(campo(r, 'solucion'), 'solucion', 2000),
+    modeloMental: texto(campo(r, 'modeloMental'), 'modeloMental', 300),
     fuente,
   };
 }

@@ -95,6 +95,23 @@ describe('Reponedor', () => {
     expect(m.pedidos).toHaveLength(5);
   });
 
+  it('avisa de cada cambio de estado: mientras pide y al terminar', async () => {
+    const vistos: string[] = [];
+    const datos: Colecciones = coleccionesVacias();
+    let k = 0;
+    const reponedor: Reponedor = new Reponedor({
+      almacen: {} as Almacen,
+      leer: () => datos,
+      guardar: async (r) => { datos.retos.push(r); },
+      pedir: (async (_a: Almacen, tema: TemaReto) => ({ tipo: 'ok', reto: generado(tema, k++) })) as never,
+      alCambiarEstado: () => vistos.push(reponedor.estado),
+    });
+    await reponedor.reponer();
+    expect(vistos[0]).toBe('Pidiendo un reto de Carrera por la AGI…');
+    expect(vistos[1]).toContain('Último reto generado');
+    expect(vistos).toHaveLength(10);
+  });
+
   it('dos llamadas a la vez comparten la misma reposición', async () => {
     const m = montar((tema) => ({ tipo: 'ok', reto: m.siguiente(tema) }));
     await Promise.all([m.reponedor.reponer(), m.reponedor.reponer()]);
