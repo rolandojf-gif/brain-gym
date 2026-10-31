@@ -34,7 +34,9 @@ interface EstadoAcordeon {
   opcionElegida: string;
   /** Confianza en la jugada inicial; null si no se pide (debate o reintento). */
   confianza: number | null;
-  logica: string;
+  /** Lo que el usuario escribe antes de ver las opciones (opcional): generar fija más que reconocer. */
+  respuestaLibre: string;
+  opcionesReveladas: boolean;
   pistaDesbloqueada: boolean;
   inicioMs: number;
 }
@@ -58,7 +60,8 @@ function estadoNuevo(retoId: string): EstadoAcordeon {
     opcionInicial: '',
     opcionElegida: '',
     confianza: null,
-    logica: '',
+    respuestaLibre: '',
+    opcionesReveladas: false,
     pistaDesbloqueada: false,
     inicioMs: Date.now(),
   };
@@ -114,7 +117,7 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
     est.paso >= 2
       ? `<div class="reto-paso">
            <div class="lbl">Paso 2 · Andamiaje opcional</div>
-           <p class="m-sub">Jugada fijada: <b>Opción ${esc(letraVisible(reto, est.opcionInicial))}</b>${est.confianza === null ? '' : ` · confianza ${esc(fmtPct(est.confianza))}`}${est.logica ? ` · «${esc(est.logica)}»` : ''}</p>
+           <p class="m-sub">Jugada fijada: <b>Opción ${esc(letraVisible(reto, est.opcionInicial))}</b>${est.confianza === null ? '' : ` · confianza ${esc(fmtPct(est.confianza))}`}${est.respuestaLibre ? ` · «${esc(est.respuestaLibre)}»` : ''}</p>
            ${
              est.pistaDesbloqueada
                ? `<div class="reto-pista"><b>Pista desbloqueada:</b> ${esc(reto.pista)}<p class="m-sub">Si has detectado el fallo, puedes cambiar la opción marcada arriba antes de ver la resolución.</p></div>`
@@ -167,16 +170,26 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
         ${tagPrevio}
       </header>
       <p class="reto-escenario">${esc(reto.escenario)}</p>
-      <form class="form-bloque" data-accion="fijar-jugada">
-        <div class="lbl">Paso 1 · Compromiso y jugada inicial</div>
-        <div class="reto-opciones">${bloqueOpciones}</div>
-        ${pedirConfianza ? renderConfianza(est) : ''}
-        <label class="campo">
-          ¿Cuál es tu lógica? (1 línea, opcional)
-          <input name="logica" value="${esc(est.logica)}" placeholder="Por qué eliges esta jugada y qué trampa descartas…" autocomplete="off"${est.paso > 1 ? ' readonly' : ''}>
-        </label>
-        ${paso1Acciones}
-      </form>
+      ${
+        est.opcionesReveladas
+          ? `<form class="form-bloque" data-accion="fijar-jugada">
+               <div class="lbl">Paso 1 · Compromiso y jugada inicial</div>
+               ${est.respuestaLibre ? `<p class="m-sub">Antes de ver las opciones escribiste: «${esc(est.respuestaLibre)}»</p>` : ''}
+               <div class="reto-opciones">${bloqueOpciones}</div>
+               ${pedirConfianza ? renderConfianza(est) : ''}
+               ${paso1Acciones}
+             </form>`
+          : `<form class="form-bloque" data-accion="ver-opciones">
+               <div class="lbl">Paso 1 · Antes de ver las opciones</div>
+               <label class="campo">
+                 ¿Qué harías tú? (una línea, opcional)
+                 <input name="respuesta" value="${esc(est.respuestaLibre)}" maxlength="300" placeholder="Con tus palabras, antes de que las opciones te sugieran nada…" autocomplete="off">
+               </label>
+               <div class="acciones">
+                 <button type="submit" class="btn primario">[ Ver opciones ]</button>
+               </div>
+             </form>`
+      }
       ${paso2}
       ${paso3}
     </article>`;
@@ -240,7 +253,7 @@ export function renderPanelRevision(ctx: Ctx, insp: InspeccionReto): string {
                 ? `Marcaste la opción ${esc(letraVisible(reto, opcionElegida))} (trampa); la jugada óptima era la ${esc(letraVisible(reto, reto.opcionCorrecta))}`
                 : `La jugada óptima era la opción ${esc(letraVisible(reto, reto.opcionCorrecta))}`
         }</b>
-        ${logica ? `<span> · Tu lógica: «${esc(logica)}»</span>` : ''}
+        ${logica ? `<span> · Lo que escribiste: «${esc(logica)}»</span>` : ''}
       </div>
       <div class="reto-explicacion">
         <span class="lbl">Explicación detallada del mecanismo y la trampa</span>
@@ -436,6 +449,14 @@ export const estudio: Vista = {
       if (v.opcion) estadoActual.opcionElegida = v.opcion;
     });
 
+    accion(raiz, 'submit', 'ver-opciones', (form, e) => {
+      e.preventDefault();
+      const est = asegurarEstado(retoActivo(ctx));
+      est.respuestaLibre = (campos(form as HTMLFormElement).respuesta ?? '').trim();
+      est.opcionesReveladas = true;
+      ctx.pintar();
+    });
+
     accion(raiz, 'submit', 'fijar-jugada', (form, e) => {
       e.preventDefault();
       const reto = retoActivo(ctx);
@@ -451,7 +472,6 @@ export const estudio: Vista = {
       }
       est.opcionInicial = v.opcion;
       est.opcionElegida = v.opcion;
-      est.logica = v.logica ?? '';
       est.paso = 2;
       ctx.pintar();
     });
@@ -478,11 +498,11 @@ export const estudio: Vista = {
       const estado = estadoAutomatico(reto, est.opcionInicial, est.opcionElegida, est.pistaDesbloqueada);
       const ahora = new Date();
       const segundos = Math.max(5, Math.round((Date.now() - est.inicioMs) / 1000));
-      // Se guardan las letras internas (estables), no las visibles. «Lógica» va al final porque se lee hasta el fin.
+      // Se guardan las letras internas (estables), no las visibles. El texto libre va al final porque se lee hasta el fin.
       const resumenJugada = [
         `Jugada: ${est.opcionElegida || '—'} (correcta: ${reto.opcionCorrecta ?? 'debate'})`,
         est.opcionInicial && est.opcionInicial !== est.opcionElegida ? `Inicial: ${est.opcionInicial}` : '',
-        est.logica ? `Lógica: ${est.logica}` : '',
+        est.respuestaLibre ? `Antes de ver opciones: ${est.respuestaLibre}` : '',
       ]
         .filter(Boolean)
         .join(' · ');
