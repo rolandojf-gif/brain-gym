@@ -49,12 +49,12 @@ describe('ia (Abogado del Diablo)', () => {
     ).toThrow(/supera el límite de 3000 caracteres/);
   });
 
-  it('construye el payload con el modelo por defecto deepseek/deepseek-v4.1-flash-1017 y max_tokens: 1500', () => {
+  it('construye el payload con el modelo por defecto deepseek/deepseek-v4.1-flash-1017 y max_tokens: 6000', () => {
     const p = { titulo: 'T', resumen: 'R', objecion: 'O' };
     const payload = construirPayloadOpenRouter('deepseek/deepseek-v4.1-flash-1017', p);
     expect(payload.model).toBe('deepseek/deepseek-v4.1-flash-1017');
     expect(payload.max_tokens).toBe(MAX_TOKENS_IA);
-    expect(payload.max_tokens).toBe(1500);
+    expect(payload.max_tokens).toBe(6000);
     expect(payload).not.toHaveProperty('response_format');
   });
 
@@ -78,7 +78,7 @@ describe('ia (Abogado del Diablo)', () => {
     });
   });
 
-  it('extrae texto cuando content es un array de bloques o viene en reasoning', () => {
+  it('extrae texto cuando content es un array de bloques, pero nunca del razonamiento', () => {
     const jsonValido = JSON.stringify({
       diagnostico: 'Diagnóstico en bloque.',
       contraataque: 'Contraataque en bloque.',
@@ -96,28 +96,21 @@ describe('ia (Abogado del Diablo)', () => {
     });
     expect(parsearRespuestaIa(desdeBloques.texto).diagnostico).toBe('Diagnóstico en bloque.');
 
-    const desdeReasoning = extraerContenidoOpenRouter({
-      choices: [
-        {
-          finish_reason: 'length',
-          message: {
-            content: null,
-            reasoning: jsonValido,
-          },
-        },
-      ],
+    // Cortado razonando: el razonamiento es el borrador del modelo, no la respuesta.
+    const cortado = extraerContenidoOpenRouter({
+      choices: [{ finish_reason: 'length', message: { content: null, reasoning: 'Let me audit this. ' + jsonValido } }],
     });
-    expect(parsearRespuestaIa(desdeReasoning.texto).contraataque).toBe('Contraataque en bloque.');
+    expect(cortado).toEqual({ texto: '', finishReason: 'length' });
   });
 
-  it('aplica fallback inteligente a diagnostico cuando el modelo responde texto plano sin JSON y lanza error sólo si está vacío', () => {
+  it('sin el JSON de la auditoría lanza un error en vez de enseñar texto suelto', () => {
     expect(() => parsearRespuestaIa('')).toThrow(ErrorValidacionIa);
     expect(() => parsearRespuestaIa('   ')).toThrow(/vacía/);
+    expect(() => parsearRespuestaIa('Let me audit this. The user says...')).toThrow(/formato esperado/);
+    expect(() => parsearRespuestaIa('{"otra": "cosa"}')).toThrow(/formato esperado/);
+  });
 
-    const textoLibre = 'Tu síntesis confunde correlación con causalidad y olvida el incentivo de salida.';
-    const fb = parsearRespuestaIa(textoLibre);
-    expect(fb.diagnostico).toBe(textoLibre);
-    expect(fb.contraataque.length).toBeGreaterThan(10);
-    expect(fb.modeloMentalSugerido.length).toBeGreaterThan(10);
+  it('razona acotado y con margen de tokens', () => {
+    expect(construirPayloadOpenRouter('x/y', { titulo: 't', resumen: 'r', objecion: 'o' })).toMatchObject({ reasoning: { effort: 'low' }, max_tokens: 6000 });
   });
 });

@@ -1,9 +1,10 @@
 /* /api/ia: audita una síntesis 3x1 de lectura («Abogado del Diablo») llamando a OpenRouter.
-   Protegida con BG_TOKEN en tiempo constante, límite de entrada (3.000 caracteres) y salida (max_tokens: 1500), y
+   Protegida con BG_TOKEN en tiempo constante, límite de entrada (3.000 caracteres) y salida (MAX_TOKENS_IA), y
    descuenta una llamada del cupo diario de IA. */
 import type { Config } from '@netlify/functions';
 import {
   MAX_CARACTERES_IA,
+  MAX_TOKENS_IA,
   MODELO_IA_POR_DEFECTO,
   construirPayloadOpenRouter,
   parsearRespuestaIa,
@@ -38,7 +39,11 @@ export default async (req: Request): Promise<Response> => {
   const model = leerEnv('OPENROUTER_MODEL') ?? MODELO_IA_POR_DEFECTO;
   try {
     if (!leerEnv('OPENROUTER_API_KEY')) throw new ErrorServidor(500, 'Falta configurar OPENROUTER_API_KEY en el servidor de Netlify');
-    const { texto } = await llamarConCupo(construirPayloadOpenRouter(model, peticion));
+    const { texto, finishReason } = await llamarConCupo(construirPayloadOpenRouter(model, peticion));
+    // Cortada, lo que llega puede ser medio JSON o el razonamiento: mejor un error claro que una auditoría rota.
+    if (finishReason === 'length') {
+      return json({ error: `La auditoría de ${model} se cortó al llegar a ${MAX_TOKENS_IA} tokens. Vuelve a intentarlo.` }, 502);
+    }
     try {
       return json(parsearRespuestaIa(texto), 200);
     } catch (e) {
