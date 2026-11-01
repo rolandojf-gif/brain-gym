@@ -61,11 +61,31 @@ export interface Lectura extends Base {
   leidaEl?: string;
 }
 
+/** Tarjeta que propone el Abogado del Diablo; se edita antes de guardarla y entonces lleva el id de la tarjeta. */
+export interface TarjetaPropuesta {
+  pregunta: string;
+  respuesta: string;
+  tarjetaId?: string;
+}
+
+export type VeredictoReplica = 'concede' | 'matiza' | 'mantiene';
+
+/** Un solo asalto: la réplica del usuario a la auditoría y la respuesta del Abogado del Diablo. */
+export interface ReplicaIa {
+  texto: string;
+  veredicto: VeredictoReplica;
+  respuesta: string;
+  fecha: string;
+}
+
 export interface FeedbackIa {
   diagnostico: string;
   contraataque: string;
   modeloMentalSugerido: string;
   fecha: string;
+  /** Desde el 2026-11-01; las auditorías anteriores no las traen. */
+  tarjetas?: TarjetaPropuesta[];
+  replica?: ReplicaIa;
 }
 
 export interface Escrito extends Base {

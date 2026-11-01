@@ -7,8 +7,12 @@ import {
   construirMensajeUsuario,
   construirPayloadOpenRouter,
   extraerContenidoOpenRouter,
+  construirPayloadReplica,
+  parsearReplica,
   parsearRespuestaIa,
+  tarjetasPropuestas,
   validarPeticionIa,
+  validarPeticionReplica,
 } from './ia';
 
 describe('ia (Abogado del Diablo)', () => {
@@ -112,5 +116,33 @@ describe('ia (Abogado del Diablo)', () => {
 
   it('razona acotado y con margen de tokens', () => {
     expect(construirPayloadOpenRouter('x/y', { titulo: 't', resumen: 'r', objecion: 'o' })).toMatchObject({ reasoning: { effort: 'low' }, max_tokens: 6000 });
+  });
+
+  it('lee las dos tarjetas propuestas e ignora las incompletas; sin ellas, propone la regla destilada', () => {
+    const fb = parsearRespuestaIa(JSON.stringify({
+      diagnostico: 'd', contraataque: 'c', modeloMentalSugerido: 'Regla: acción.',
+      tarjetas: [{ pregunta: '¿Qué pieza falta en Abilene?', respuesta: 'Ignorancia pluralista.' }, { pregunta: 'sin respuesta' }, { pregunta: '¿Dónde colapsa?', respuesta: 'Con voto secreto.' }, { pregunta: 'x', respuesta: 'y' }],
+    }));
+    expect(fb.tarjetas).toEqual([
+      { pregunta: '¿Qué pieza falta en Abilene?', respuesta: 'Ignorancia pluralista.' },
+      { pregunta: '¿Dónde colapsa?', respuesta: 'Con voto secreto.' },
+    ]);
+    const antigua = parsearRespuestaIa(JSON.stringify({ diagnostico: 'd', contraataque: 'c', modeloMentalSugerido: 'Regla: acción.' }));
+    expect(antigua.tarjetas).toBeUndefined();
+    expect(tarjetasPropuestas(antigua, 'Abilene')).toEqual([{ pregunta: '«Abilene»: ¿dónde colapsa o cuál es su límite real?', respuesta: 'Regla: acción.' }]);
+  });
+
+  it('réplica: valida, construye el mensaje con la auditoría y parsea el veredicto', () => {
+    const base = { titulo: 'Abilene', resumen: 'r', objecion: 'o', auditoria: { diagnostico: 'Falta la ignorancia pluralista.', contraataque: 'Es el desenlace.' } };
+    expect(() => validarPeticionReplica({ ...base, replica: '  ' })).toThrow(/réplica/);
+    expect(() => validarPeticionReplica({ ...base, replica: 'x'.repeat(601) })).toThrow(/600/);
+    expect(() => validarPeticionReplica({ ...base, auditoria: {}, replica: 'Sí' })).toThrow(/auditoría/);
+    const p = validarPeticionReplica({ ...base, replica: 'La comodidad incluye el miedo a ser la piedra en el bote.' });
+    const payload = construirPayloadReplica('x/y', p) as { messages: { content: string }[]; reasoning: unknown };
+    expect(payload.messages[1]?.content).toContain('Falta la ignorancia pluralista.');
+    expect(payload.messages[1]?.content).toContain('piedra en el bote');
+    expect(payload.reasoning).toEqual({ effort: 'low' });
+    expect(parsearReplica('```json\n{"veredicto": "Matiza", "respuesta": "El miedo sí, la comodidad no."}\n```')).toEqual({ veredicto: 'matiza', respuesta: 'El miedo sí, la comodidad no.' });
+    expect(() => parsearReplica('{"veredicto": "quizá", "respuesta": "x"}')).toThrow(/formato esperado/);
   });
 });
