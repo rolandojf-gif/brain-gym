@@ -3,13 +3,13 @@
    (Tesis central, Mecanismo/Incentivo, Punto ciego/Objeción). Sólo después de guardar el escrito se habilita el
    juicio del Abogado del Diablo (/api/ia). */
 import { accion, campos, type Ctx, type Vista } from '../app';
-import { ErrorDeIa, auditarConIa } from '../datos/ia';
+import { ErrorDeIa, auditarConIa, replicarConIa } from '../datos/ia';
 import { LECTURAS_SEMILLA, lecturasIniciales } from '../dominio/ajustes';
-import { CONTRAATAQUE_ROTO } from '../dominio/ia';
+import { CONTRAATAQUE_ROTO, MAX_CARACTERES_TEXTO_REPLICA, tarjetasPropuestas } from '../dominio/ia';
 import { nuevaTarjeta } from '../dominio/fsrs';
 import { actualizar, nuevo } from '../dominio/registro';
 import { contarPalabras } from '../dominio/texto';
-import type { Escrito, Lectura } from '../dominio/tipos';
+import type { Escrito, FeedbackIa, Lectura, TarjetaPropuesta, VeredictoReplica } from '../dominio/tipos';
 import { fmtFecha, fmtRelativo, plural } from '../lib/fmt';
 import { esc, urlSegura } from '../lib/html';
 import { cabecera, vacio } from './comun';
@@ -17,6 +17,9 @@ import { cabecera, vacio } from './comun';
 const MAX_CAMPO = 40;
 
 let auditandoId: string | null = null;
+let replicandoId: string | null = null;
+/** Lo escrito en la réplica, para no perderlo si falla y se repinta. */
+const borradorReplica = new Map<string, string>();
 let errorIaPorEscrito: { id: string; mensaje: string } | null = null;
 
 interface Borrador3x1 {
@@ -156,9 +159,23 @@ function renderAbogadoDelDiablo(ctx: Ctx, e: Escrito, l: Lectura | undefined): s
         ${err ? `<p class="ia-error" role="alert">${esc(err)}</p>` : ''}
       </div>`;
   }
-  const yaTieneTarjeta = ctx.datos.tarjetas.some(
-    (t) => !t.borrado && t.origen?.coleccion === 'escritos' && t.origen.id === e.id && t.reverso === fb.modeloMentalSugerido,
-  );
+  const titulo = l?.titulo ?? 'Lectura';
+  // Una propuesta sin `tarjetaId` aún no se ha guardado; en auditorías antiguas, la regla cuenta como guardada si ya
+  // existía una tarjeta con ella.
+  const guardada = (t: TarjetaPropuesta) =>
+    Boolean(t.tarjetaId) ||
+    (!fb.tarjetas?.length && ctx.datos.tarjetas.some((x) => !x.borrado && x.origen?.coleccion === 'escritos' && x.origen.id === e.id && x.reverso === t.respuesta));
+  const propuestas = tarjetasPropuestas(fb, titulo)
+    .map((t, i) =>
+      guardada(t)
+        ? `<div class="ad-tarjeta"><p><b>${esc(t.pregunta)}</b></p><p>${esc(t.respuesta)}</p><span class="tag e-sin_ayuda">✓ Guardada en Repaso</span></div>`
+        : `<form class="ad-tarjeta form-bloque" data-accion="guardar-propuesta" data-id="${esc(e.id)}" data-i="${i}">
+            <label class="campo">Pregunta<textarea name="pregunta" rows="2" required>${esc(t.pregunta)}</textarea></label>
+            <label class="campo">Respuesta<textarea name="respuesta" rows="2" required>${esc(t.respuesta)}</textarea></label>
+            <div class="acciones"><button class="btn primario">[ Guardar tarjeta ]</button></div>
+          </form>`,
+    )
+    .join('');
 
   return `
     <aside class="panel abogado-diablo" aria-label="Dictamen del Abogado del Diablo">
@@ -177,17 +194,38 @@ function renderAbogadoDelDiablo(ctx: Ctx, e: Escrito, l: Lectura | undefined): s
       <div class="ad-bloque ad-regla">
         <span class="ad-lbl">REGLA DESTILADA:</span>
         <p><b>${esc(fb.modeloMentalSugerido)}</b></p>
-        <div class="acciones">
-          ${
-            yaTieneTarjeta
-              ? '<span class="tag e-sin_ayuda">✓ Tarjeta FSRS creada con este ángulo</span>'
-              : `<button type="button" class="btn primario" data-accion="tarjeta-angulo-ia" data-id="${esc(e.id)}" data-titulo="${esc(l?.titulo ?? 'Lectura')}">[ + Crear tarjeta FSRS con este ángulo ]</button>`
-          }
-          ${repetir}
-        </div>
-        ${err ? `<p class="ia-error" role="alert">${esc(err)}</p>` : ''}
       </div>
+      ${renderReplica(e, fb)}
+      <div class="ad-bloque">
+        <span class="ad-lbl">TARJETAS PROPUESTAS · EDÍTALAS ANTES DE GUARDAR:</span>
+        ${propuestas}
+      </div>
+      <div class="acciones">${repetir}</div>
+      ${err ? `<p class="ia-error" role="alert">${esc(err)}</p>` : ''}
     </aside>`;
+}
+
+const VEREDICTO: Record<VeredictoReplica, string> = { concede: 'Te lo concede', matiza: 'Te da parte de razón', mantiene: 'Se mantiene' };
+
+/* Un solo asalto: primero piensas tú (defiendes o concedes) y luego responde; no es un chat. */
+function renderReplica(e: Escrito, fb: FeedbackIa): string {
+  if (fb.replica) {
+    return `
+      <div class="ad-bloque">
+        <span class="ad-lbl">TU RÉPLICA:</span>
+        <p>${esc(fb.replica.texto)}</p>
+        <span class="ad-lbl">${esc(VEREDICTO[fb.replica.veredicto])}:</span>
+        <p>${esc(fb.replica.respuesta)}</p>
+      </div>`;
+  }
+  const cargando = replicandoId === e.id;
+  return `
+    <form class="ad-bloque form-bloque" data-accion="replicar-ia" data-id="${esc(e.id)}">
+      <label class="campo"><span class="ad-lbl">TU RÉPLICA (OPCIONAL, UN ASALTO):</span>
+        <textarea name="replica" rows="3" maxlength="${MAX_CARACTERES_TEXTO_REPLICA}" required placeholder="Defiende tu síntesis o concede. Una o dos frases."${cargando ? ' disabled' : ''}>${esc(borradorReplica.get(e.id) ?? '')}</textarea>
+      </label>
+      <div class="acciones"><button class="btn"${cargando ? ' disabled' : ''}>${cargando ? '[ Esperando respuesta… ]' : '[ Replicar ]'}</button></div>
+    </form>`;
 }
 
 function renderVer(ctx: Ctx, id: string): string {
@@ -316,17 +354,58 @@ export const lectura: Vista = {
         ctx.pintar();
       }
     });
-    accion(raiz, 'click', 'tarjeta-angulo-ia', async (b) => {
-      const id = b.dataset.id ?? '';
-      const escrito = ctx.datos.escritos.find((x) => x.id === id && !x.borrado);
-      if (!escrito?.feedbackIa) return;
+    accion(raiz, 'submit', 'guardar-propuesta', async (form, ev) => {
+      ev.preventDefault();
+      const escrito = ctx.datos.escritos.find((x) => x.id === form.dataset.id && !x.borrado);
+      const fb = escrito?.feedbackIa;
+      if (!escrito || !fb) return;
+      const v = campos(form as HTMLFormElement);
+      const pregunta = (v.pregunta ?? '').trim();
+      const respuesta = (v.respuesta ?? '').trim();
+      if (!pregunta || !respuesta) return;
       const l = ctx.datos.lecturas.find((x) => x.id === escrito.lecturaId);
-      const titulo = l?.titulo ?? b.dataset.titulo ?? 'Lectura';
-      const anverso = `«${titulo}»: ¿Dónde colapsa o cuál es su límite real?`;
-      const reverso = escrito.feedbackIa.modeloMentalSugerido;
-      const tarjeta = nuevaTarjeta(anverso, reverso, new Date(), { coleccion: 'escritos', id: escrito.id });
-      await ctx.guardar({ coleccion: 'tarjetas', registro: tarjeta });
-      ctx.avisar('Tarjeta FSRS creada con la regla destilada.');
+      const i = Number(form.dataset.i);
+      const ahora = new Date();
+      const tarjeta = nuevaTarjeta(pregunta, respuesta, ahora, { coleccion: 'escritos', id: escrito.id });
+      // Se guarda lo editado y el id de la tarjeta, para que la propuesta quede marcada como guardada.
+      const tarjetas = tarjetasPropuestas(fb, l?.titulo ?? 'Lectura').map((t, k) => (k === i ? { pregunta, respuesta, tarjetaId: tarjeta.id } : t));
+      await ctx.guardar(
+        { coleccion: 'tarjetas', registro: tarjeta },
+        { coleccion: 'escritos', registro: actualizar(escrito, { feedbackIa: { ...fb, tarjetas } }, ahora) },
+      );
+      ctx.avisar('Tarjeta guardada en Repaso.');
+    });
+    accion(raiz, 'submit', 'replicar-ia', async (form, ev) => {
+      ev.preventDefault();
+      const escrito = ctx.datos.escritos.find((x) => x.id === form.dataset.id && !x.borrado);
+      const fb = escrito?.feedbackIa;
+      const texto = (campos(form as HTMLFormElement).replica ?? '').trim();
+      if (!escrito || !fb || !texto || replicandoId) return;
+      const l = ctx.datos.lecturas.find((x) => x.id === escrito.lecturaId);
+      replicandoId = escrito.id;
+      borradorReplica.set(escrito.id, texto);
+      errorIaPorEscrito = null;
+      ctx.pintar();
+      try {
+        const replica = await replicarConIa(ctx.almacen, {
+          titulo: l?.titulo ?? 'Lectura',
+          ...(l?.medio ? { medio: l.medio } : {}),
+          ...(l?.tema ? { tema: l.tema } : {}),
+          resumen: escrito.resumen,
+          objecion: escrito.objecion,
+          auditoria: { diagnostico: fb.diagnostico, contraataque: fb.contraataque },
+          replica: texto,
+        });
+        replicandoId = null;
+        borradorReplica.delete(escrito.id);
+        await ctx.guardar({ coleccion: 'escritos', registro: actualizar(escrito, { feedbackIa: { ...fb, replica } }, new Date()) });
+      } catch (err) {
+        replicandoId = null;
+        const mensaje = err instanceof ErrorDeIa ? err.message : 'No se pudo enviar la réplica. Revisa tu conexión.';
+        errorIaPorEscrito = { id: escrito.id, mensaje };
+        ctx.avisar(mensaje, 'error');
+        ctx.pintar();
+      }
     });
   },
 };

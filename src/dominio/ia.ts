@@ -1,8 +1,13 @@
 /* Dominio puro del «Sparring de IA / Abogado del Diablo» para auditar síntesis 3x1 de lectura.
    Sin red ni DOM: valida el payload de entrada (máx. 3.000 caracteres), construye el cuerpo para OpenRouter,
-   extrae contenido de respuestas string o bloques y parsea el JSON con fallback inteligente. */
+   extrae contenido de respuestas string o bloques y parsea el JSON. También la réplica: un asalto más tras la auditoría. */
+import type { TarjetaPropuesta, VeredictoReplica } from './tipos';
 
 export const MAX_CARACTERES_IA = 3000;
+/** La réplica lleva además la auditoría y la respuesta del usuario. */
+export const MAX_CARACTERES_REPLICA = 6000;
+/** Una o dos frases: la réplica es un asalto, no otro ensayo. */
+export const MAX_CARACTERES_TEXTO_REPLICA = 600;
 /* Holgado: el razonamiento del modelo también gasta de aquí, y una respuesta cortada se pierde entera. */
 export const MAX_TOKENS_IA = 6000;
 export const MODELO_IA_POR_DEFECTO = 'deepseek/deepseek-v4.1-flash-1017';
@@ -24,8 +29,18 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con estas 3 claves exactas:
 {
   "diagnostico": "(Máx 60 palabras) Evalúa si el mecanismo que propone el usuario explica de verdad su tesis o sólo la repite con otras palabras. Señala la pieza del incentivo o del modelo causal que falta. Si conoces bien la obra, di si la síntesis la traiciona; si no, no lo supongas.",
   "contraataque": "(Máx 80 palabras) Ataca su 'Punto ciego / Objeción'. Si su objeción es blanda o convencional, destrúyela explicando cómo el autor se defendería, y revela cuál es la verdadera vulnerabilidad de segundo orden o el caso límite donde la tesis original colapsa de verdad.",
-  "modeloMentalSugerido": "(Máx 25 palabras) Una regla mental afilada en una sola frase (formato: 'Nombre del principio: Regla accionable') que capture el ángulo oculto o el contraataque, lista para guardarse como tarjeta de memoria FSRS."
-}`;
+  "modeloMentalSugerido": "(Máx 25 palabras) Una regla mental afilada en una sola frase (formato: 'Nombre del principio: Regla accionable') que capture el ángulo oculto o el contraataque, lista para guardarse como tarjeta de memoria FSRS.",
+  "tarjetas": [
+    {"pregunta": "Sobre la pieza que faltaba en el mecanismo: una pregunta que nombre la obra y se pueda responder de memoria sin releerla", "respuesta": "(Máx 25 palabras) La respuesta precisa"},
+    {"pregunta": "Sobre la vulnerabilidad real o el caso límite donde la tesis colapsa, también nombrando la obra", "respuesta": "(Máx 25 palabras) La respuesta precisa"}
+  ]
+}
+Las preguntas de "tarjetas" no deben poder responderse con sí o no ni copiar la respuesta en el enunciado.`;
+
+export const SYSTEM_PROMPT_REPLICA = `Eres el mismo auditor lógico implacable que acaba de auditar la síntesis 3x1 de un lector (te la paso junto con tu auditoría). El lector te replica en una o dos frases: defiende su síntesis, matiza o concede.
+REGLAS: castellano, cero adulación, directo. Juzga sólo si su réplica tiene razón; no repitas tu auditoría. Si acierta, concédelo sin rodeos; si acierta en parte, di exactamente en qué; si no, explica en qué falla con un ejemplo o caso límite concreto.
+Responde ÚNICAMENTE con el objeto JSON crudo, sin markdown:
+{"veredicto": "concede" | "matiza" | "mantiene", "respuesta": "(Máx 70 palabras) Tu respuesta a la réplica"}`;
 
 export interface PeticionIa {
   titulo: string;
@@ -39,6 +54,17 @@ export interface RespuestaAbogadoDiablo {
   diagnostico: string;
   contraataque: string;
   modeloMentalSugerido: string;
+  tarjetas?: TarjetaPropuesta[];
+}
+
+export interface PeticionReplica extends PeticionIa {
+  auditoria: { diagnostico: string; contraataque: string };
+  replica: string;
+}
+
+export interface RespuestaReplica {
+  veredicto: VeredictoReplica;
+  respuesta: string;
 }
 
 export class ErrorValidacionIa extends Error {
@@ -185,10 +211,12 @@ export function parsearRespuestaIa(contenido: unknown): RespuestaAbogadoDiablo {
         const contraataque = typeof r.contraataque === 'string' ? r.contraataque.trim() : '';
         const modeloMentalSugerido = typeof r.modeloMentalSugerido === 'string' ? r.modeloMentalSugerido.trim() : '';
         if (diagnostico || contraataque || modeloMentalSugerido) {
+          const tarjetas = leerTarjetas(r.tarjetas);
           return {
             diagnostico: diagnostico || 'Sin diagnóstico adicional.',
             contraataque: contraataque || 'Sin contraataque adicional.',
             modeloMentalSugerido: modeloMentalSugerido || 'Auditoría lógica: Revisa los supuestos implícitos de tu síntesis.',
+            ...(tarjetas.length ? { tarjetas } : {}),
           };
         }
       }
@@ -211,4 +239,81 @@ export function extraerSubcadenaJson(texto: string): string | null {
     return sinFences.slice(primerCorchete, ultimoCorchete + 1);
   }
   return null;
+}
+
+/** Las tarjetas propuestas son un extra: las que no traigan pregunta y respuesta se ignoran, sin romper la auditoría. */
+function leerTarjetas(valor: unknown): TarjetaPropuesta[] {
+  if (!Array.isArray(valor)) return [];
+  return valor
+    .map((t) => (typeof t === 'object' && t !== null ? (t as Record<string, unknown>) : {}))
+    .map((t) => ({ pregunta: typeof t.pregunta === 'string' ? t.pregunta.trim() : '', respuesta: typeof t.respuesta === 'string' ? t.respuesta.trim() : '' }))
+    .filter((t) => t.pregunta && t.respuesta)
+    .slice(0, 2);
+}
+
+/** Lo que el usuario puede guardar como tarjetas: las propuestas o, en auditorías anteriores, la regla destilada. */
+export function tarjetasPropuestas(fb: { modeloMentalSugerido: string; tarjetas?: TarjetaPropuesta[] }, titulo: string): TarjetaPropuesta[] {
+  if (fb.tarjetas?.length) return fb.tarjetas;
+  return [{ pregunta: `«${titulo}»: ¿dónde colapsa o cuál es su límite real?`, respuesta: fb.modeloMentalSugerido }];
+}
+
+/* ── Réplica ──────────────────────────────────────────────────────────── */
+
+export function validarPeticionReplica(entrada: unknown): PeticionReplica {
+  if (typeof entrada !== 'object' || entrada === null || Array.isArray(entrada)) {
+    throw new ErrorValidacionIa('El cuerpo de la petición debe ser un objeto JSON.');
+  }
+  if (JSON.stringify(entrada).length > MAX_CARACTERES_REPLICA) {
+    throw new ErrorValidacionIa(`La réplica supera el límite de ${MAX_CARACTERES_REPLICA} caracteres.`);
+  }
+  const obj = entrada as Record<string, unknown>;
+  const peticion = validarPeticionIa({ titulo: obj.titulo, medio: obj.medio, tema: obj.tema, resumen: obj.resumen, objecion: obj.objecion });
+  const replica = typeof obj.replica === 'string' ? obj.replica.trim() : '';
+  if (!replica) throw new ErrorValidacionIa('Falta tu réplica.');
+  if (replica.length > MAX_CARACTERES_TEXTO_REPLICA) throw new ErrorValidacionIa(`La réplica no puede pasar de ${MAX_CARACTERES_TEXTO_REPLICA} caracteres.`);
+  const a = (typeof obj.auditoria === 'object' && obj.auditoria !== null ? obj.auditoria : {}) as Record<string, unknown>;
+  const diagnostico = typeof a.diagnostico === 'string' ? a.diagnostico.trim() : '';
+  const contraataque = typeof a.contraataque === 'string' ? a.contraataque.trim() : '';
+  if (!diagnostico || !contraataque) throw new ErrorValidacionIa('Falta la auditoría a la que respondes.');
+  return { ...peticion, auditoria: { diagnostico, contraataque }, replica };
+}
+
+export function construirPayloadReplica(model: string, p: PeticionReplica): Record<string, unknown> {
+  const contenido = [
+    construirMensajeUsuario(p),
+    '',
+    '=== TU AUDITORÍA ===',
+    `Diagnóstico: ${p.auditoria.diagnostico}`,
+    `Contraataque: ${p.auditoria.contraataque}`,
+    '',
+    '=== RÉPLICA DEL LECTOR ===',
+    p.replica,
+  ].join('\n');
+  return {
+    model,
+    max_tokens: MAX_TOKENS_IA,
+    temperature: 0.3,
+    reasoning: { effort: 'low' },
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT_REPLICA },
+      { role: 'user', content: contenido },
+    ],
+  };
+}
+
+const VEREDICTOS: readonly VeredictoReplica[] = ['concede', 'matiza', 'mantiene'];
+
+export function parsearReplica(contenido: unknown): RespuestaReplica {
+  const limpio = extraerSubcadenaJson(aTextoPlano(contenido));
+  if (limpio) {
+    try {
+      const r = JSON.parse(limpio) as Record<string, unknown>;
+      const veredicto = typeof r.veredicto === 'string' ? r.veredicto.trim().toLowerCase() : '';
+      const respuesta = typeof r.respuesta === 'string' ? r.respuesta.trim() : '';
+      if (respuesta && (VEREDICTOS as readonly string[]).includes(veredicto)) return { veredicto: veredicto as VeredictoReplica, respuesta };
+    } catch {
+      /* cae al error inferior */
+    }
+  }
+  throw new ErrorValidacionIa('El modelo no devolvió la respuesta a tu réplica en el formato esperado. Vuelve a intentarlo.');
 }

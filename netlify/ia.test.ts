@@ -2,7 +2,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Almacen } from '../src/datos/almacen';
-import { ErrorDeIa, auditarConIa } from '../src/datos/ia';
+import { ErrorDeIa, auditarConIa, replicarConIa } from '../src/datos/ia';
 import { MAX_CARACTERES_IA, SYSTEM_PROMPT_ABOGADO_DIABLO } from '../src/dominio/ia';
 import { MAX_LLAMADAS_IA_DIA, MAX_LLAMADAS_RETOS_DIA } from '../src/dominio/retos-ia';
 
@@ -156,6 +156,38 @@ describe('/api/ia', () => {
     expect(res.status).toBe(429);
     expect(((await res.json()) as { error: string }).error).toContain('Tope diario');
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe('/api/ia con réplica', () => {
+  it('responde a la réplica con su veredicto, con su propio límite de tamaño', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ message: { content: '{"veredicto": "concede", "respuesta": "Tienes razón: el miedo es la pieza."}' } }] }), { status: 200 }),
+    );
+    const cuerpo = { ...cuerpoValido, auditoria: { diagnostico: respuestaModelo.diagnostico, contraataque: respuestaModelo.contraataque }, replica: 'La garantía la emite un tercero que sobrevive.' };
+    const res = await handler(peticion(cuerpo));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ veredicto: 'concede', respuesta: 'Tienes razón: el miedo es la pieza.' });
+    const enviado = JSON.parse(String(spy.mock.calls[0]?.[1]?.body)) as { messages: { content: string }[] };
+    expect(enviado.messages[0]?.content).toContain('replica');
+  });
+});
+
+describe('cliente replicarConIa', () => {
+  it('devuelve la réplica con tu texto, el veredicto y la fecha', async () => {
+    const almacen = await Almacen.abrir('bg-test-ia-replica');
+    try {
+      await almacen.ponerMeta('token', TOKEN);
+      const fetch = vi.fn(async () => new Response(JSON.stringify({ veredicto: 'mantiene', respuesta: 'No: sin verificación no hay garantía.' }), { status: 200 }));
+      const r = await replicarConIa(
+        almacen,
+        { ...cuerpoValido, auditoria: { diagnostico: 'd', contraataque: 'c' }, replica: 'Las garantías bastan.' },
+        { fetch, ahora: new Date('2026-11-01T09:00:00Z') },
+      );
+      expect(r).toEqual({ texto: 'Las garantías bastan.', veredicto: 'mantiene', respuesta: 'No: sin verificación no hay garantía.', fecha: '2026-11-01T09:00:00.000Z' });
+    } finally {
+      almacen.cerrar();
+    }
   });
 });
 

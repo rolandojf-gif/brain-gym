@@ -314,6 +314,17 @@ table.cap td { padding: 6px 8px; }
 }
 .ad-regla .ad-lbl { color: var(--lime); }
 .ad-regla p { font-family: var(--f-mono); font-size: 14.5px; color: #FFFFFF; }
+/* Réplica y tarjetas propuestas, dentro del panel oscuro. */
+.abogado-diablo .campo { color: #E8E7E1; flex: none; }
+.ad-tarjeta .tag { align-self: flex-start; }
+.abogado-diablo .acciones { margin-top: 0; }
+.abogado-diablo textarea {
+  width: 100%; background: #181816; color: #FFFFFF;
+  border: 2px solid #4A4A44; padding: 10px 12px; font: 400 15px/1.5 var(--f-body);
+}
+.abogado-diablo textarea:focus { outline: 2px solid var(--lime); outline-offset: 1px; }
+.ad-tarjeta { border: 2px dashed #4A4A44; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.ad-tarjeta + .ad-tarjeta { margin-top: 10px; }
 
 /* ── Calibración ──────────────────────────────────────────────────────── */
 .graf-cal { margin-top: 18px; max-width: 520px; }
