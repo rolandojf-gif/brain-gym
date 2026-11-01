@@ -55,3 +55,12 @@ La versión del sprint diario se sentía como una obligación. El objetivo pasa 
 - **Retos generados por IA:** entran (Fase 2), con fuente verificada, revisor y botón «esto está mal». Temas nuevos: carrera por la AGI (tema 5, sólo generados) y psicología (el tema 4 pasa a «Psicología, Sesgos y Modelos Mentales»).
 - **Mezcla de catálogo y generados:** alternar. En cada tema, uno del catálogo y uno generado mientras queden del catálogo; después, sólo generados.
 
+## D7. Portada con vida · decidida (1 nov 2026)
+
+Hoy se sentía «sosa, de Windows 95». Se vieron tres maquetas (misma estética con vida, rediseño oscuro moderno, un solo dilema a pantalla completa) y Rolando eligió la primera: se mantiene la estética de MOLOCH.SH.
+
+- **Logo:** una matriz de pagos 2×2 (lima coopera, naranja traiciona) cuya jugada va rotando. Sustituye al `>_` en la cabecera, el favicon y los iconos de la app.
+- **Animación con contenido:** una rejilla viva del dilema del prisionero espacial (Nowak y May, 1992), con la tentación ajustable y un botón para sembrar un traidor. Enseña algo (la cooperación sobrevive en grupos) en vez de decorar, y no puntúa nada.
+- **Invitar a participar:** el reto va primero y grande, con su pregunta destacada y «¿Qué harías tú?» ya en la portada; lo escrito allí abre el reto con las opciones visibles.
+- **Cabecera y franja alineadas con el contenido** en pantallas anchas (`main` pasa de 1080 a 1200 px), para que el logo no quede perdido en una esquina.
+

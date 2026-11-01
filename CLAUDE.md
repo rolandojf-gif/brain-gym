@@ -14,7 +14,7 @@ Web personal de un solo usuario para aprender por curiosidad sobre **Teoría de 
 
 ## Navegación (6 pestañas)
 
-- `01 Hoy` (`#hoy`): menú de tres tarjetas (un reto con tema rotativo y selector, una lectura, una idea convertible en tarjeta) y una línea discreta si hay tarjetas vencidas.
+- `01 Hoy` (`#hoy`): menú de tres tarjetas (un reto destacado con tema rotativo, selector y «¿Qué harías tú?», una lectura, una idea convertible en tarjeta), la rejilla viva del dilema del prisionero espacial y un aviso discreto si hay tarjetas vencidas.
 - `02 Retos` (`#estudio`): Ring de sparring con acordeón de 3 pasos. Cinco temas: el catálogo integrado de 32 retos en los cuatro primeros y retos generados por IA en todos (la carrera por la AGI, sólo generados), alternando catálogo y generados. El estado lo deduce la app; los retos de debate y los generados marcados como erróneos no cuentan en las estadísticas.
 - `03 Lectura` (`#lectura`): Extracción Quirúrgica 3x1 (Tesis central, Mecanismo/Incentivo, Punto ciego/Objeción; máx. ~40 palabras por campo).
 - `04 Repaso` (`#repaso`): Mazo FSRS (`ts-fsrs`) alimentado desde los retos fallados, lecturas y aprendizajes diarios.
