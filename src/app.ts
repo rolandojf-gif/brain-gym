@@ -27,6 +27,9 @@ export interface Ctx {
   sync: EstadoSync & { tieneToken: boolean };
   /** Última novedad de los retos generados en segundo plano (vacío si aún no hay). */
   retosIa: string;
+  /** Hoy dejó de pedir retos por descartes seguidos; se puede volver a intentar a mano. */
+  retosIaPausados: boolean;
+  reintentarRetos(): Promise<void>;
   sincronizar(): Promise<void>;
   /** Guarda (o borra, con '') la clave de sincronización de este dispositivo y sincroniza. */
   ponerToken(token: string): Promise<void>;
@@ -97,6 +100,8 @@ export class App {
       pintar: () => this.alCambiar(true),
       sync: { ...this.sync, tieneToken: this.tieneToken },
       retosIa: this.reponedor.estado,
+      retosIaPausados: this.reponedor.pausadoPorDescartes,
+      reintentarRetos: () => this.reponedor.reintentar(),
       sincronizar: () => this.sincronizar(),
       ponerToken: async (token) => {
         await this.almacen.ponerMeta('token', token);
