@@ -86,7 +86,7 @@ Objetivo: lo más simple que sea correcto para un usuario con dos dispositivos.
 
 ## Hoy
 
-Un menú, no una agenda: un reto, una lectura y una idea, más una línea discreta si hay tarjetas vencidas. El tema del reto lo da `temaSiguiente(intentos, retos)` (`src/dominio/catalogo-retos.ts`): el tema siguiente al del último reto jugado, en orden circular, saltando los que no tienen retos por estrenar. El selector de Hoy lo cambia hasta que se juega otro reto. Un tema sin ningún reto (la carrera por la AGI antes del primer generado) no se ofrece.
+Un menú, no una agenda: un reto (destacado, con «¿Qué harías tú?»), una lectura y una idea, más un aviso discreto si hay tarjetas vencidas y la rejilla viva del dilema del prisionero espacial (`src/dominio/rejilla.ts`, dibujada en un canvas por `src/vistas/rejilla.ts`; su estado vive en el módulo para que repintar Hoy no la reinicie, y se para sola al salir de Hoy, con la pestaña oculta o con «reducir movimiento»). Lo escrito en «¿Qué harías tú?» pasa al reto con `empezarReto` (`src/vistas/estudio.ts`), que lo abre con las opciones ya visibles. El tema del reto lo da `temaSiguiente(intentos, retos)` (`src/dominio/catalogo-retos.ts`): el tema siguiente al del último reto jugado, en orden circular, saltando los que no tienen retos por estrenar. El selector de Hoy lo cambia hasta que se juega otro reto. Un tema sin ningún reto (la carrera por la AGI antes del primer generado) no se ofrece.
 
 ## Retos: catálogo y generados
 

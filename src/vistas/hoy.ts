@@ -1,16 +1,22 @@
-/* 01 · Hoy: un menú, no una agenda. Tres cosas para elegir (un reto, una lectura, una idea) y, si hay tarjetas
-   vencidas, una línea discreta para repasarlas. Nada se marca como pendiente ni hecho. */
+/* 01 · Hoy: un menú, no una agenda. Tres cosas para elegir (un reto, una lectura, una idea), una rejilla viva que
+   enseña algo de teoría de juegos mientras decides y, si hay tarjetas vencidas, un aviso discreto para repasarlas.
+   Nada se marca como pendiente ni hecho. El reto va primero y grande: es lo que más invita a participar. */
 import { accion, campos, type Ctx, type Vista } from '../app';
 import { BLOQUES_RETOS, CATALOGO_RETOS, retosJugables, siguienteRetoPendiente, temaSiguiente, todosLosRetos, type Reto } from '../dominio/catalogo-retos';
 import { nuevaTarjeta, vencidas } from '../dominio/fsrs';
 import { actualizar, nuevo } from '../dominio/registro';
+import { separarPregunta } from '../dominio/texto';
 import type { Aprendizaje, TemaReto } from '../dominio/tipos';
 import { fmtFechaLarga, plural } from '../lib/fmt';
 import { esc, urlSegura } from '../lib/html';
-import { cabecera } from './comun';
+import { empezarReto } from './estudio';
+import { montarRejilla, renderRejilla } from './rejilla';
 
 /** Tema elegido a mano en el selector. Vale hasta que se juega un reto: después vuelve la rotación. */
 let temaElegido: { id: TemaReto; el: string } | null = null;
+
+/** Lo escrito en «¿Qué harías tú?»: sobrevive a un repintado (una sincronización) mientras sea del mismo reto. */
+let borrador = { retoId: '', texto: '' };
 
 function temaActual(ctx: Ctx, jugables: readonly Reto[]): TemaReto {
   const rotacion = temaSiguiente(ctx.datos.intentos, jugables);
@@ -22,7 +28,7 @@ function temaActual(ctx: Ctx, jugables: readonly Reto[]): TemaReto {
 function renderRepaso(ctx: Ctx): string {
   const n = vencidas(ctx.datos.tarjetas, ctx.ahora).length;
   if (n === 0) return '';
-  return `<p class="linea-repaso">${plural(n, 'tarjeta para repasar', 'tarjetas para repasar')} · <a href="#repaso">Repasar</a></p>`;
+  return `<a class="chip-repaso" href="#repaso">${plural(n, 'tarjeta para repasar', 'tarjetas para repasar')} →</a>`;
 }
 
 function renderReto(ctx: Ctx): string {
@@ -30,7 +36,8 @@ function renderReto(ctx: Ctx): string {
   const tema = temaActual(ctx, jugables);
   const reto = siguienteRetoPendiente(ctx.datos.intentos, jugables, tema) ?? CATALOGO_RETOS[0];
   const bloque = BLOQUES_RETOS.find((b) => b.id === reto.bloque);
-  const resumen = reto.escenario.length > 170 ? `${reto.escenario.slice(0, 170).trimEnd()}…` : reto.escenario;
+  const { cuerpo, pregunta } = separarPregunta(reto.escenario);
+  const escrito = borrador.retoId === reto.id ? borrador.texto : '';
   // Un tema sin ningún reto (la carrera por la AGI antes del primer generado) no se ofrece.
   const selector = BLOQUES_RETOS.filter((b) => jugables.some((r) => r.bloque === b.id)).map(
     (b) =>
@@ -38,15 +45,24 @@ function renderReto(ctx: Ctx): string {
   ).join('');
 
   return `
-    <article class="act">
-      <header><h2>Un reto</h2></header>
-      <p class="m-sub">${esc(bloque?.titulo ?? '')}${reto.generado ? ' · generado por IA' : ''}</p>
-      <p><b>${esc(reto.titulo)}</b></p>
-      <p>${esc(resumen)}</p>
-      <div class="seg tema" role="group" aria-label="Tema del reto">${selector}</div>
-      <div class="acciones">
-        <a class="btn primario" href="#estudio/reto/${esc(reto.id)}">[ Jugar ]</a>
-      </div>
+    <article class="act act-reto">
+      <header>
+        <h2>Un reto</h2>
+        <span class="m-sub">${esc(bloque?.titulo ?? '')}${reto.generado ? ' · generado por IA' : ''}${reto.debate ? ' · debate' : ''}</span>
+      </header>
+      <p class="reto-hoy-titulo">${esc(reto.titulo)}</p>
+      <p>${esc(cuerpo)}</p>
+      ${pregunta ? `<p class="reto-hoy-pregunta">${esc(pregunta)}</p>` : ''}
+      <form class="form-bloque" data-accion="jugar" data-id="${esc(reto.id)}">
+        <label class="campo">
+          ¿Qué harías tú? Antes de ver las opciones (opcional)
+          <textarea name="respuesta" rows="2" maxlength="300" data-accion="borrador-reto" data-id="${esc(reto.id)}" placeholder="Tu jugada y por qué, en una o dos líneas.">${esc(escrito)}</textarea>
+        </label>
+        <div class="reto-hoy-pie">
+          <div class="seg tema" role="group" aria-label="Tema del reto">${selector}</div>
+          <button class="btn primario grande">Jugar →</button>
+        </div>
+      </form>
     </article>`;
 }
 
@@ -57,27 +73,29 @@ function renderLectura(ctx: Ctx): string {
   let cuerpo: string;
   if (porEscribir) {
     cuerpo = `
-      <p>Ya leíste <b>«${esc(porEscribir.titulo)}»</b>. Queda extraer de memoria la tesis, el mecanismo y el punto ciego.</p>
+      <p class="act-obra">«${esc(porEscribir.titulo)}»</p>
+      <p>Ya la leíste. Queda extraer de memoria la tesis, el mecanismo y el punto ciego.</p>
       <div class="acciones">
-        <a class="btn primario" href="#lectura/escribir/${esc(porEscribir.id)}">[ Escribir el 3x1 ]</a>
+        <a class="btn primario" href="#lectura/escribir/${esc(porEscribir.id)}">Escribir el 3x1</a>
       </div>`;
   } else if (siguiente) {
     const url = urlSegura(siguiente.url);
     cuerpo = `
-      <p><b>«${esc(siguiente.titulo)}»</b>${siguiente.medio ? ` <span class="m-sub">(${esc(siguiente.medio)})</span>` : ''}</p>
+      <p class="act-obra">«${esc(siguiente.titulo)}»</p>
+      ${siguiente.medio ? `<p class="m-sub">${esc(siguiente.medio)}</p>` : ''}
       <div class="acciones">
         ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Abrir ↗</a>` : ''}
-        <button type="button" class="btn primario" data-accion="lectura-leida" data-id="${esc(siguiente.id)}">[ Leída · escribir 3x1 ]</button>
+        <button type="button" class="btn primario" data-accion="lectura-leida" data-id="${esc(siguiente.id)}">Leída: escribir 3x1</button>
         <a class="btn sutil" href="#lectura">Ver cola</a>
       </div>`;
   } else {
     cuerpo = `
       <p>La cola está vacía.</p>
-      <div class="acciones"><a class="btn primario" href="#lectura">[ Añadir una lectura ]</a></div>`;
+      <div class="acciones"><a class="btn primario" href="#lectura">Añadir una lectura</a></div>`;
   }
 
   return `
-    <article class="act">
+    <article class="act act-lectura">
       <header><h2>Una lectura</h2></header>
       ${cuerpo}
     </article>`;
@@ -87,19 +105,19 @@ function renderIdea(ctx: Ctx): string {
   const deHoy = ctx.datos.aprendizajes.filter((x) => !x.borrado && x.dia === ctx.hoy).sort((a, b) => b.creado.localeCompare(a.creado));
   const ultima = deHoy[0];
   return `
-    <article class="act">
+    <article class="act act-idea">
       <header><h2>Una idea</h2></header>
       ${ultima ? `<p class="m-sub">Hoy apuntaste: «${esc(ultima.texto)}»${deHoy.length > 1 ? ` y ${plural(deHoy.length - 1, 'otra', 'otras')}` : ''}.</p>` : ''}
       <form class="form-bloque" data-accion="aprendizaje">
         <label class="campo">
-          Una idea o modelo mental que te llevas (una línea)
+          Un modelo mental que te llevas, en una línea
           <input name="texto" required placeholder="Ley de Goodhart: la métrica que se persigue deja de medir.">
         </label>
         <label class="check-linea">
           <input type="checkbox" name="crearTarjeta" value="si" checked>
-          <span>Convertir también en tarjeta de repaso</span>
+          <span>Convertir también en tarjeta</span>
         </label>
-        <div class="acciones"><button class="btn primario">[ Guardar ]</button></div>
+        <div class="acciones"><button class="btn primario">Guardar</button></div>
       </form>
     </article>`;
 }
@@ -108,17 +126,39 @@ export const hoy: Vista = {
   titulo: 'Hoy',
   render(ctx) {
     return `
-      <section class="view">
-        ${cabecera('¿Qué te apetece?', `${fmtFechaLarga(ctx.hoy)} · Elige una cosa; con una basta.`)}
-        ${renderRepaso(ctx)}
-        <div class="acts">
+      <section class="view hoy">
+        <div class="hoy-grid">
+          <div class="hoy-saludo">
+            <p class="kicker">${esc(fmtFechaLarga(ctx.hoy))}</p>
+            <h1>¿Qué te apetece?</h1>
+            <p class="lede">Elige una cosa; con una basta.</p>
+            ${renderRepaso(ctx)}
+          </div>
+          ${renderRejilla()}
           ${renderReto(ctx)}
-          ${renderLectura(ctx)}
-          ${renderIdea(ctx)}
+          <div class="hoy-lado">
+            ${renderLectura(ctx)}
+            ${renderIdea(ctx)}
+          </div>
         </div>
       </section>`;
   },
   montar(ctx, raiz) {
+    montarRejilla(raiz);
+
+    accion(raiz, 'input', 'borrador-reto', (el) => {
+      borrador = { retoId: el.dataset.id ?? '', texto: (el as HTMLTextAreaElement).value };
+    });
+
+    accion(raiz, 'submit', 'jugar', (form, e) => {
+      e.preventDefault();
+      const id = form.dataset.id;
+      if (!id) return;
+      empezarReto(id, campos(form as HTMLFormElement).respuesta ?? '');
+      borrador = { retoId: '', texto: '' };
+      ctx.ir(`#estudio/reto/${id}`);
+    });
+
     accion(raiz, 'click', 'tema', (b) => {
       const id = BLOQUES_RETOS.find((x) => x.id === b.dataset.tema)?.id;
       if (!id) return;

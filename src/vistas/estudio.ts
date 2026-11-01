@@ -72,6 +72,17 @@ function estadoNuevo(retoId: string): EstadoAcordeon {
   };
 }
 
+/**
+ * Llega desde Hoy con lo que el usuario ya escribió antes de ver las opciones: el reto abre con ese paso hecho.
+ * Un reto ya empezado no se toca, para no perder la jugada fijada.
+ */
+export function empezarReto(retoId: string, respuestaLibre: string): void {
+  const texto = respuestaLibre.replace(/\s+/g, ' ').trim().slice(0, 300);
+  if (!texto) return;
+  if (estadoActual?.retoId === retoId && (estadoActual.opcionesReveladas || estadoActual.paso > 1)) return;
+  estadoActual = { ...estadoNuevo(retoId), respuestaLibre: texto, opcionesReveladas: true };
+}
+
 /** Catálogo y generados (también los reportados, para el historial y la revisión). */
 const retosDe = (ctx: Ctx): Reto[] => todosLosRetos(ctx.datos.retos);
 
