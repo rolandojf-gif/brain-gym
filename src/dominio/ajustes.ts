@@ -51,10 +51,11 @@ export const LECTURAS_SEMILLA: readonly SemillaLectura[] = [
   },
   {
     id: 'lectura-semilla-03',
-    titulo: 'The Evolution of Trust (Dilema del Prisionero Iterado)',
-    medio: 'Nicky Case',
+    // Sustituye a «The Evolution of Trust» (ncase.me): es un juego interactivo, no una lectura para extraer un 3x1.
+    titulo: "The Prisoner's Dilemma: iterated play and the evolution of cooperation",
+    medio: 'Stanford Encyclopedia of Philosophy',
     tema: 'Cooperación, Reciprocidad y Horizonte Temporal',
-    url: 'https://ncase.me/trust/',
+    url: 'https://plato.stanford.edu/entries/prisoner-dilemma/',
   },
   {
     id: 'lectura-semilla-04',
