@@ -3,7 +3,8 @@
    extrae contenido de respuestas string o bloques y parsea el JSON con fallback inteligente. */
 
 export const MAX_CARACTERES_IA = 3000;
-export const MAX_TOKENS_IA = 1500;
+/* Holgado: el razonamiento del modelo también gasta de aquí, y una respuesta cortada se pierde entera. */
+export const MAX_TOKENS_IA = 6000;
 export const MODELO_IA_POR_DEFECTO = 'deepseek/deepseek-v4.1-flash-1017';
 
 export const SYSTEM_PROMPT_ABOGADO_DIABLO = `Eres un auditor lógico implacable, experto en Teoría de Juegos, Diseño de Incentivos, Sistemas Complejos y Sesgos Cognitivos.
@@ -95,6 +96,9 @@ export function construirPayloadOpenRouter(model: string, peticion: PeticionIa):
     model,
     max_tokens: MAX_TOKENS_IA,
     temperature: 0.3,
+    // Razonar le sienta bien a una auditoría, pero acotado: con el razonamiento por defecto de DeepSeek V4.1 Flash
+    // se quedaba sin tokens a mitad del JSON.
+    reasoning: { effort: 'low' },
     messages: [
       { role: 'system', content: SYSTEM_PROMPT_ABOGADO_DIABLO },
       { role: 'user', content: construirMensajeUsuario(peticion) },
@@ -105,7 +109,7 @@ export function construirPayloadOpenRouter(model: string, peticion: PeticionIa):
 /**
  * Extrae el texto útil del objeto devuelto por OpenRouter:
  * soporta `message.content` como string, como array de bloques `[{ type: 'text', text: '...' }]`,
- * `choice.text` o fallback a `message.reasoning` / `message.reasoning_content` si el modelo agotó tokens pensando.
+ * o `choice.text`. Nunca el razonamiento (`message.reasoning`): es el borrador del modelo, no su respuesta.
  */
 export function extraerContenidoOpenRouter(cuerpo: unknown): { texto: string; finishReason?: string; errorDetalle?: string } {
   if (typeof cuerpo !== 'object' || cuerpo === null) {
@@ -118,8 +122,6 @@ export function extraerContenidoOpenRouter(cuerpo: unknown): { texto: string; fi
       text?: unknown;
       message?: {
         content?: unknown;
-        reasoning?: unknown;
-        reasoning_content?: unknown;
       };
     }[];
   };
@@ -137,10 +139,7 @@ export function extraerContenidoOpenRouter(cuerpo: unknown): { texto: string; fi
   }
 
   const content = choice.message?.content;
-  const extraido = aTextoPlano(content)
-    || aTextoPlano(choice.text)
-    || aTextoPlano(choice.message?.reasoning)
-    || aTextoPlano(choice.message?.reasoning_content);
+  const extraido = aTextoPlano(content) || aTextoPlano(choice.text);
 
   return {
     texto: extraido.trim(),
@@ -167,9 +166,8 @@ function aTextoPlano(valor: unknown): string {
 }
 
 /**
- * Extrae el JSON buscando el primer `{` y el último `}` (anti-markdown).
- * Si el modelo responde con texto válido en español pero no en formato JSON exacto,
- * hace un fallback inteligente asignando el texto recibido a `diagnostico`.
+ * Extrae el JSON buscando el primer `{` y el último `}` (anti-markdown). Sin las tres claves no hay auditoría:
+ * se lanza un error en vez de enseñar texto suelto, que solía ser el modelo pensando en voz alta.
  */
 export function parsearRespuestaIa(contenido: unknown): RespuestaAbogadoDiablo {
   const texto = aTextoPlano(contenido);
@@ -199,14 +197,11 @@ export function parsearRespuestaIa(contenido: unknown): RespuestaAbogadoDiablo {
     }
   }
 
-  // Fallback inteligente cuando el modelo responde en texto libre sin JSON válido
-  const textoSinFences = texto.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-  return {
-    diagnostico: textoSinFences,
-    contraataque: 'El modelo devolvió su auditoría en formato de texto continuo (ver diagnóstico superior).',
-    modeloMentalSugerido: 'Auditoría directa: Contrasta las fisuras señaladas arriba con tu punto ciego original.',
-  };
+  throw new ErrorValidacionIa('El modelo no devolvió la auditoría en el formato esperado. Vuelve a intentarlo.');
 }
+
+/** Lo que guardaba el antiguo «fallback» de texto libre: la auditoría salió rota y conviene repetirla. */
+export const CONTRAATAQUE_ROTO = 'El modelo devolvió su auditoría en formato de texto continuo (ver diagnóstico superior).';
 
 export function extraerSubcadenaJson(texto: string): string | null {
   const sinFences = texto.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();

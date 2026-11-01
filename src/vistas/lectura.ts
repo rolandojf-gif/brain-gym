@@ -5,6 +5,7 @@
 import { accion, campos, type Ctx, type Vista } from '../app';
 import { ErrorDeIa, auditarConIa } from '../datos/ia';
 import { LECTURAS_SEMILLA, lecturasIniciales } from '../dominio/ajustes';
+import { CONTRAATAQUE_ROTO } from '../dominio/ia';
 import { nuevaTarjeta } from '../dominio/fsrs';
 import { actualizar, nuevo } from '../dominio/registro';
 import { contarPalabras } from '../dominio/texto';
@@ -144,6 +145,17 @@ function renderAbogadoDelDiablo(ctx: Ctx, e: Escrito, l: Lectura | undefined): s
   }
 
   const fb = e.feedbackIa;
+  // Las auditorías guardadas con el antiguo «fallback» de texto libre salieron rotas (el razonamiento del modelo).
+  const rota = fb.contraataque === CONTRAATAQUE_ROTO;
+  const repetir = `<button type="button" class="btn ${rota ? 'primario' : 'sutil'}" data-accion="auditar-ia" data-id="${esc(e.id)}"${cargando ? ' disabled' : ''}>${cargando ? '[ Auditando… ]' : 'Repetir auditoría'}</button>`;
+  if (rota) {
+    return `
+      <div class="ia-cta">
+        <p class="ia-error">La auditoría anterior salió rota: el modelo se quedó sin espacio y se guardó su borrador. Repítela.</p>
+        <div class="acciones">${repetir}</div>
+        ${err ? `<p class="ia-error" role="alert">${esc(err)}</p>` : ''}
+      </div>`;
+  }
   const yaTieneTarjeta = ctx.datos.tarjetas.some(
     (t) => !t.borrado && t.origen?.coleccion === 'escritos' && t.origen.id === e.id && t.reverso === fb.modeloMentalSugerido,
   );
@@ -171,7 +183,9 @@ function renderAbogadoDelDiablo(ctx: Ctx, e: Escrito, l: Lectura | undefined): s
               ? '<span class="tag e-sin_ayuda">✓ Tarjeta FSRS creada con este ángulo</span>'
               : `<button type="button" class="btn primario" data-accion="tarjeta-angulo-ia" data-id="${esc(e.id)}" data-titulo="${esc(l?.titulo ?? 'Lectura')}">[ + Crear tarjeta FSRS con este ángulo ]</button>`
           }
+          ${repetir}
         </div>
+        ${err ? `<p class="ia-error" role="alert">${esc(err)}</p>` : ''}
       </div>
     </aside>`;
 }

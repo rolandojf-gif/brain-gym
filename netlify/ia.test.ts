@@ -71,7 +71,7 @@ describe('/api/ia', () => {
     expect(await r.json()).toMatchObject({ error: expect.stringMatching(/3000 caracteres/) });
   });
 
-  it('envía max_tokens: 1500, temperature: 0.3, sin response_format en Claude, y soporta bloques de contenido', async () => {
+  it('envía max_tokens: 6000, temperature: 0.3, sin response_format en Claude, y soporta bloques de contenido', async () => {
     const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -103,7 +103,7 @@ describe('/api/ia', () => {
       messages: { role: string; content: string }[];
     };
     expect(enviado.model).toBe('deepseek/deepseek-v4.1-flash-1017');
-    expect(enviado.max_tokens).toBe(1500);
+    expect(enviado.max_tokens).toBe(6000);
     expect(enviado.temperature).toBe(0.3);
     expect(enviado.response_format).toBeUndefined();
     expect(enviado.messages[0]).toEqual({ role: 'system', content: SYSTEM_PROMPT_ABOGADO_DIABLO });
@@ -126,6 +126,17 @@ describe('/api/ia', () => {
     expect(body.error).toContain('HTTP 400');
     expect(body.error).toContain('anthropic/modelo-inexistente-test');
     expect(body.error).toContain('is not a valid model ID');
+  });
+
+  it('una auditoría cortada por max_tokens responde 502 con un mensaje claro, sin enseñar el razonamiento', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ finish_reason: 'length', message: { content: '{"diagnostico": "El mecanismo no', reasoning: 'Let me audit this.' } }] }), { status: 200 }),
+    );
+    const res = await handler(peticion(cuerpoValido));
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('se cortó');
+    expect(body.error).not.toContain('Let me audit');
   });
 
   it('descuenta del cupo diario compartido y responde 429 cuando se agota', async () => {
