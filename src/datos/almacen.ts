@@ -78,7 +78,13 @@ export class Almacen {
       const tienda = tx.objectStore('lecturas');
       for (const s of LECTURAS_SEMILLA) {
         const existente = (await tienda.get(s.id)) as Lectura | undefined;
-        if (existente && (existente.url !== s.url || existente.medio !== s.medio)) {
+        if (!existente) continue;
+        if (existente.titulo !== s.titulo) {
+          // Semilla sustituida por otra obra: sólo si aún no se ha leído, para no cambiar la obra bajo un 3x1 ya escrito.
+          if (existente.estado === 'pendiente') {
+            await tienda.put(actualizar(existente, { url: s.url, medio: s.medio, titulo: s.titulo, tema: s.tema }, ahora));
+          }
+        } else if (existente.url !== s.url || existente.medio !== s.medio) {
           await tienda.put(actualizar(existente, { url: s.url, medio: s.medio }, ahora));
         }
       }

@@ -30,6 +30,22 @@ function servidor() {
 }
 
 describe('Almacen', () => {
+  it.each([
+    ['pendiente', "The Prisoner's Dilemma", 'https://plato.stanford.edu/entries/prisoner-dilemma/'],
+    ['leida', 'The Evolution of Trust', 'https://ncase.me/trust/'],
+  ] as const)('una semilla sustituida por otra obra se cambia sólo si aún no se ha leído (estado %s)', async (estado, titulo, url) => {
+    const nombre = `bg-semilla-sustituida-${estado}`;
+    (await abrir(nombre)).cerrar();
+    // Como estaba antes: «The Evolution of Trust» de ncase.me.
+    const db = await openDB(nombre);
+    const vieja = (await db.get('lecturas', 'lectura-semilla-03')) as Record<string, unknown>;
+    await db.put('lecturas', { ...vieja, titulo: 'The Evolution of Trust (Dilema del Prisionero Iterado)', medio: 'Nicky Case', url: 'https://ncase.me/trust/', estado });
+    db.close();
+    const l = (await (await abrir(nombre, new Date(T0.getTime() + 1000))).leer('lecturas')).find((x) => x.id === 'lectura-semilla-03');
+    expect(l?.titulo).toContain(titulo);
+    expect(l?.url).toBe(url);
+  });
+
   it('la primera vez siembra ajustes, fuentes y las 12 lecturas semilla, y no los duplica al reabrir', async () => {
     const nombre = 'bg-siembra';
     const a = await abrir(nombre);
