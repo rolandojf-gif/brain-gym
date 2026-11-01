@@ -9,6 +9,7 @@ import {
   parsearRetoGenerado,
   parsearRevision,
   payloadGenerar,
+  payloadRevisar,
   reservarCupo,
   urlFuenteValida,
   validarPeticionReto,
@@ -51,6 +52,9 @@ describe('petición de reto', () => {
     expect(m).toContain('Carrera por la AGI');
     expect(m).toContain('La pausa que nadie firma');
     expect(payloadGenerar('x/y', { tema: '1', vistos: [] })).toMatchObject({ model: 'x/y', max_tokens: expect.any(Number) });
+    // El generador no razona (agotaba los tokens antes de escribir); el revisor sí, con margen.
+    expect(payloadGenerar('x/y', { tema: '1', vistos: [] })).toMatchObject({ reasoning: { effort: 'none' } });
+    expect(payloadRevisar('x/y', valido() as never)).toMatchObject({ reasoning: { effort: 'low' }, max_tokens: 6000 });
   });
 });
 

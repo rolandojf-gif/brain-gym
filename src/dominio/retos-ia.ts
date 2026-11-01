@@ -6,7 +6,7 @@ import type { LetraOpcion, RetoGenerado, TemaReto } from './tipos';
 /* Holgados a propósito: en los modelos que razonan antes de responder, el razonamiento también gasta de aquí, y una
    respuesta cortada se pierde entera. Con modelos «flash» el coste es despreciable. */
 export const MAX_TOKENS_GENERAR = 4000;
-export const MAX_TOKENS_REVISAR = 1200;
+export const MAX_TOKENS_REVISAR = 6000;
 /** Tope de llamadas a la IA por día (UTC) entre todas las funciones: limita el gasto si algo entra en bucle. */
 export const MAX_LLAMADAS_IA_DIA = 40;
 /** Llamadas del cupo diario que los retos no pueden usar: quedan siempre para el Abogado del Diablo. */
@@ -111,6 +111,9 @@ export function payloadGenerar(model: string, p: PeticionReto): Record<string, u
     model,
     max_tokens: MAX_TOKENS_GENERAR,
     temperature: 0.8,
+    // Sin razonamiento: DeepSeek V4.1 Flash piensa por defecto y agotaba los tokens antes de escribir el reto. Para
+    // redactar un JSON no hace falta; el que comprueba que sólo haya una opción defendible es el revisor.
+    reasoning: { effort: 'none' },
     messages: [
       { role: 'system', content: SYSTEM_PROMPT_GENERAR },
       { role: 'user', content: mensajeGenerar(p) },
@@ -272,6 +275,8 @@ export function payloadRevisar(model: string, reto: RetoPropuesto): Record<strin
     model,
     max_tokens: MAX_TOKENS_REVISAR,
     temperature: 0,
+    // El revisor sí razona (juzgar si hay una sola opción defendible lo pide), con margen de tokens para hacerlo.
+    reasoning: { effort: 'low' },
     messages: [
       { role: 'system', content: SYSTEM_PROMPT_REVISAR },
       { role: 'user', content: JSON.stringify(reto) },

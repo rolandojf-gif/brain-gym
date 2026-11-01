@@ -19,6 +19,7 @@ function panelRetosIa(ctx: Ctx): string {
     <div class="panel">
       <p>${listos} sin jugar · ${vivos.length} generados en total${reportados ? ` · ${reportados} marcados como erróneos` : ''}.</p>
       ${ctx.retosIa ? `<p class="estado-sync">${esc(ctx.retosIa)}</p>` : ''}
+      ${ctx.retosIaPausados ? `<div class="acciones"><button type="button" class="btn sutil" data-accion="reintentar-retos">Volver a intentarlo</button></div>` : ''}
       <p class="note">La app los pide sola, uno por tema, cuando tiene la clave de sincronización. Topes diarios: ${MAX_PETICIONES_DIA} peticiones por dispositivo y ${MAX_LLAMADAS_RETOS_DIA} llamadas a la IA entre los dos; otras ${RESERVA_ABOGADO} quedan siempre para el Abogado del Diablo.</p>
     </div>`;
 }
@@ -81,6 +82,7 @@ export const datos: Vista = {
       await ctx.ponerToken('');
     });
     accion(raiz, 'click', 'sincronizar', () => ctx.sincronizar());
+    accion(raiz, 'click', 'reintentar-retos', () => ctx.reintentarRetos());
     accion(raiz, 'click', 'exportar', async () => {
       const exp = await ctx.almacen.exportar();
       descargar(`brain-gym-${ctx.hoy}.json`, JSON.stringify(exp, null, 2));

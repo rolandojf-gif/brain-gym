@@ -162,6 +162,20 @@ describe('Reponedor', () => {
     expect(m.datos.retos).toHaveLength(5);
   });
 
+  it('«Volver a intentarlo» olvida los descartes seguidos de hoy, pero no el tope de peticiones', async () => {
+    let r: (tema: TemaReto) => ResultadoReto = () => ({ tipo: 'descartado', mensaje: 'Reto descartado (formato): se cortó al llegar a 4000 tokens' });
+    const m = montar((tema) => r(tema));
+    await m.reponedor.reponer();
+    expect(m.reponedor.pausadoPorDescartes).toBe(true);
+    // Los dos mensajes se encadenan con punto aunque el primero no lo traiga.
+    expect(m.reponedor.estado).toContain('4000 tokens. Tras 3 descartes seguidos');
+    r = (tema) => ({ tipo: 'ok', reto: m.siguiente(tema) });
+    await m.reponedor.reintentar();
+    expect(m.reponedor.pausadoPorDescartes).toBe(false);
+    expect(m.datos.retos).toHaveLength(5);
+    expect(m.memoria.valor).toMatchObject({ peticiones: 8, descartesSeguidos: 0 });
+  });
+
   it(`no pasa de ${MAX_PETICIONES_DIA} peticiones al día por dispositivo, aunque se reabra la app`, async () => {
     let ahora = T0.getTime();
     // Retos que no llegan a guardarse: el tema sigue vacío y el reponedor querría pedir sin fin.

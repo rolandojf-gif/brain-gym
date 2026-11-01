@@ -91,6 +91,7 @@ export class Reponedor {
   private enCurso: Promise<void> | null = null;
   private descartes = new Map<TemaReto, number>();
   private pausaHasta = 0;
+  private paradoPorDescartes = false;
   private readonly memoria: MemoriaGasto;
 
   constructor(private readonly deps: DepsReponedor) {
@@ -118,10 +119,28 @@ export class Reponedor {
     return this.enCurso;
   }
 
+  /** Si hoy ha parado por descartes seguidos: Datos ofrece entonces «Volver a intentarlo». */
+  get pausadoPorDescartes(): boolean {
+    return this.paradoPorDescartes;
+  }
+
   /** Tras cambiar la clave de sincronización: vuelve a intentarlo aunque antes fallara. Los topes diarios siguen. */
   reiniciar(): void {
     this.descartes.clear();
     this.pausaHasta = 0;
+  }
+
+  /**
+   * «Volver a intentarlo» en Datos, tras un arreglo: olvida los descartes seguidos de hoy y vuelve a pedir. El tope
+   * de peticiones del día se mantiene, así que no puede gastar más de lo previsto.
+   */
+  async reintentar(): Promise<void> {
+    await this.enCurso;
+    const hoy = diaUtc((this.deps.reloj ?? Date.now)());
+    const gasto = await this.memoria.leer();
+    if (gasto?.dia === hoy) await this.memoria.guardar({ ...gasto, descartesSeguidos: 0 });
+    this.reiniciar();
+    return this.reponer();
   }
 
   private async bucle(): Promise<void> {
@@ -130,14 +149,16 @@ export class Reponedor {
     const hoy = diaUtc(reloj());
     const guardado = await this.memoria.leer();
     let gasto: GastoRetos = guardado?.dia === hoy ? guardado : { dia: hoy, peticiones: 0, descartesSeguidos: 0, ultimo: '' };
+    this.paradoPorDescartes = false;
 
     while (reloj() >= this.pausaHasta) {
       if (gasto.descartesSeguidos >= MAX_DESCARTES_SEGUIDOS) {
-        this.estado = `${gasto.ultimo} Tras ${MAX_DESCARTES_SEGUIDOS} descartes seguidos, este dispositivo no pide más hasta mañana.`;
+        this.paradoPorDescartes = true;
+        this.estado = `${frase(gasto.ultimo)} Tras ${MAX_DESCARTES_SEGUIDOS} descartes seguidos, este dispositivo no pide más hasta mañana.`;
         return;
       }
       if (gasto.peticiones >= MAX_PETICIONES_DIA) {
-        this.estado = `${gasto.ultimo} Este dispositivo ya ha pedido hoy ${MAX_PETICIONES_DIA} retos; mañana pedirá más.`;
+        this.estado = `${frase(gasto.ultimo)} Este dispositivo ya ha pedido hoy ${MAX_PETICIONES_DIA} retos; mañana pedirá más.`;
         return;
       }
       const datos = this.deps.leer();
@@ -171,6 +192,12 @@ export class Reponedor {
       this.estado = gasto.ultimo;
     }
   }
+}
+
+/** Cierra con punto lo que no acabe en signo de puntuación, para encadenar dos mensajes. */
+function frase(texto: string): string {
+  const t = texto.trim();
+  return !t || /[.!?…»]$/.test(t) ? t : `${t}.`;
 }
 
 function diaUtc(ms: number): string {
