@@ -64,7 +64,7 @@ Hoy se sentía «sosa, de Windows 95». Se vieron tres maquetas (misma estética
 - **Invitar a participar:** el reto va primero y grande, con su pregunta destacada y «¿Qué harías tú?» ya en la portada; lo escrito allí abre el reto con las opciones visibles.
 - **Cabecera y franja alineadas con el contenido** en pantallas anchas (`main` pasa de 1080 a 1200 px), para que el logo no quede perdido en una esquina.
 
-## D8. Secuencias, un juego de atención · propuesta (8 nov 2026)
+## D8. Secuencias, un juego de atención · decidida (8 nov 2026)
 
 Rolando pidió una tarea tipo RVP (Rapid Visual Information Processing, Cambridge): dígitos del 2 al 9 a 100 por minuto, tres secuencias objetivo (2-4-6, 3-5-7, 4-6-8), respuesta con la barra espaciadora y ritmo adaptativo. Es un juego propio, sin nombre, arte ni aspecto de otras apps.
 
