@@ -188,6 +188,8 @@ table.plan thead th { font: 700 11px var(--f-mono); text-transform: uppercase; b
 }
 .chip-repaso::before { content: ''; width: 10px; height: 10px; background: var(--orange); border: 2px solid var(--ink); }
 .chip-repaso:hover { background: rgba(204, 255, 0, .3); }
+.chip-juego { align-self: flex-start; font: 600 12.5px/1.3 var(--f-mono); color: var(--muted); text-decoration: none; border-bottom: 1px dashed var(--muted); }
+.chip-juego:hover { color: var(--text); border-bottom-color: var(--text); }
 
 /* La rejilla viva: siempre sobre asfalto, en los dos temas. */
 .rejilla {
@@ -416,3 +418,40 @@ table.cap td { padding: 6px 8px; }
   .franja { padding: 7px 14px; }
   .seg-btn { padding: 7px 8px; }
 }
+
+/* ── Secuencias (juego de atención) ───────────────────────────────────── */
+.secuencias { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.secuencias .view-head { margin-bottom: 0; }
+.sec-objetivos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.sec-objetivos span {
+  display: flex; justify-content: center; align-items: center; gap: 6px; padding: 10px 6px;
+  background: var(--card); border: 2px solid var(--ink); box-shadow: var(--shadow-sm);
+  font: 700 clamp(18px, 4vw, 26px)/1 var(--f-mono); font-variant-numeric: tabular-nums;
+}
+.sec-objetivos i { font-style: normal; color: var(--orange-ink); }
+.sec-reglas p { margin: 0 0 10px; }
+/* La escena va siempre sobre asfalto, como la rejilla: el dígito destaca igual en los dos temas. */
+.sec-escena {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: clamp(220px, 42vh, 360px); background: var(--asphalt); color: #E8E7E1;
+  border: 3px solid var(--ink); box-shadow: var(--shadow);
+}
+.sec-barra { position: absolute; inset: 0 0 auto 0; height: 6px; background: #2E2E2A; }
+.sec-barra span { display: block; height: 100%; width: 0; background: var(--lime); transition: width .3s linear; }
+.sec-digito { font: 700 clamp(110px, 26vw, 200px)/1 var(--f-mono); font-variant-numeric: tabular-nums; color: #E8E7E1; }
+.sec-ritmo { position: absolute; bottom: 10px; right: 12px; margin: 0; color: #9C9B95; }
+.sec-bien { animation: sec-bien .35s ease-out; }
+.sec-mal { animation: sec-mal .35s ease-out; }
+@keyframes sec-bien { from { box-shadow: inset 0 0 0 10px var(--lime), var(--shadow); } }
+@keyframes sec-mal { from { box-shadow: inset 0 0 0 10px var(--orange), var(--shadow); } }
+.sec-boton {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  width: 100%; min-height: 96px; background: var(--lime); color: #121211;
+  border: 3px solid var(--ink); box-shadow: var(--shadow);
+  font: 700 22px/1 var(--f-head); text-transform: uppercase; letter-spacing: .02em;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.sec-boton small { font: 500 11px/1 var(--f-mono); text-transform: none; letter-spacing: 0; }
+.sec-boton:active { transform: translate(3px, 3px); box-shadow: none; }
+.sec-pie { justify-content: center; margin-top: 0; }
+@media (hover: hover) and (pointer: fine) { .sec-boton { min-height: 72px; } }

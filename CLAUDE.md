@@ -20,6 +20,7 @@ Web personal de un solo usuario para aprender por curiosidad sobre **Teoría de 
 - `04 Repaso` (`#repaso`): Mazo FSRS (`ts-fsrs`) alimentado desde los retos fallados, lecturas y aprendizajes diarios.
 - `05 Progreso` (`#progreso`): retos jugados por tema, tarjetas aprendidas y retención, lecturas e ideas, y calibración en retos (Brier, sesgo y margen de ruido). Sin calendario ni tasas de acierto.
 - `06 Datos` (`#datos`): Sincronización entre dispositivos, exportación/importación JSON y hora de corte del día.
+- Sin pestaña: `#secuencias`, juego de atención sostenida (inspirado en el RVP de Cambridge) al que se entra desde un enlace discreto en Hoy. No guarda nada.
 
 ## Stack
 

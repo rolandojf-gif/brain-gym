@@ -12,6 +12,7 @@ import { hoy } from './vistas/hoy';
 import { lectura } from './vistas/lectura';
 import { progreso } from './vistas/progreso';
 import { repaso } from './vistas/repaso';
+import { secuencias } from './vistas/secuencias';
 
 const $ = <T extends Element>(s: string) => document.querySelector<T>(s);
 const $$ = <T extends Element>(s: string) => [...document.querySelectorAll<T>(s)];
@@ -23,6 +24,8 @@ const VISTAS: Record<string, Vista> = {
   repaso,
   progreso,
   datos,
+  // Sin pestaña: se entra desde Hoy.
+  secuencias,
 };
 
 let app: App;
