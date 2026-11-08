@@ -133,6 +133,7 @@ export const hoy: Vista = {
             <h1>¿Qué te apetece?</h1>
             <p class="lede">Elige una cosa; con una basta.</p>
             ${renderRepaso(ctx)}
+            <a class="chip-juego" href="#secuencias">Secuencias: un juego de atención →</a>
           </div>
           ${renderRejilla()}
           ${renderReto(ctx)}

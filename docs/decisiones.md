@@ -64,3 +64,15 @@ Hoy se sentía «sosa, de Windows 95». Se vieron tres maquetas (misma estética
 - **Invitar a participar:** el reto va primero y grande, con su pregunta destacada y «¿Qué harías tú?» ya en la portada; lo escrito allí abre el reto con las opciones visibles.
 - **Cabecera y franja alineadas con el contenido** en pantallas anchas (`main` pasa de 1080 a 1200 px), para que el logo no quede perdido en una esquina.
 
+## D8. Secuencias, un juego de atención · decidida (8 nov 2026)
+
+Rolando pidió una tarea tipo RVP (Rapid Visual Information Processing, Cambridge): dígitos del 2 al 9 a 100 por minuto, tres secuencias objetivo (2-4-6, 3-5-7, 4-6-8), respuesta con la barra espaciadora y ritmo adaptativo. Es un juego propio, sin nombre, arte ni aspecto de otras apps.
+
+- **Dónde:** dirección propia (`#secuencias`) con un enlace discreto en Hoy, sin pestaña: una opción del menú, no un deber.
+- **Fallo:** cuentan el falso positivo y la omisión (si no, no pulsar nunca saldría gratis).
+- **Ritmo:** empieza en 600 ms; cada 5 aciertos seguidos −50 ms; cada fallo +50 ms; entre 350 y 900 ms.
+- **Ventana de respuesta:** 1,5 s desde el último dígito de la secuencia, porque una respuesta suele llegar con el dígito siguiente ya en pantalla.
+- **Objetivos:** se insertan unos 8 por cada 100 dígitos (al azar saldrían menos de 2). Partidas de 2 minutos.
+- **Datos:** no se guarda nada; al acabar, un resumen (aciertos, omisiones, falsas alarmas, reacción mediana, ritmo). Guardar un historial exigiría una colección nueva y subir el esquema.
+- **Móvil:** botón táctil grande que responde al tocar (`pointerdown`), no al levantar el dedo.
+
