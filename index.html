@@ -32,21 +32,29 @@
   </a>
 
   <nav class="navtabs" aria-label="Secciones">
-    <a class="navtab" href="#hoy" data-view="hoy"><i>01</i><span>Hoy</span></a>
-    <a class="navtab" href="#estudio" data-view="estudio"><i>02</i><span>Retos</span></a>
-    <a class="navtab" href="#lectura" data-view="lectura"><i>03</i><span>Lectura</span></a>
-    <a class="navtab" href="#repaso" data-view="repaso"><i>04</i><span>Repaso</span></a>
-    <a class="navtab" href="#progreso" data-view="progreso"><i>05</i><span>Progreso</span></a>
-    <a class="navtab" href="#datos" data-view="datos"><i>06</i><span>Datos</span></a>
+    <a class="navtab" href="#hoy" data-view="hoy">Hoy</a>
+    <a class="navtab" href="#estudio" data-view="estudio">Retos</a>
+    <a class="navtab" href="#lectura" data-view="lectura">Lectura</a>
+    <a class="navtab" href="#repaso" data-view="repaso">Repaso</a>
   </nav>
 
-  <div class="seg theme" role="group" aria-label="Tema">
-    <button class="seg-btn" data-theme-set="auto" aria-pressed="false">Auto</button>
-    <button class="seg-btn" data-theme-set="light" aria-pressed="false">Claro</button>
-    <button class="seg-btn" data-theme-set="dark" aria-pressed="false">Oscuro</button>
-  </div>
+  <a class="aviso-sync" id="aviso-sync" href="#datos" hidden></a>
+
+  <details class="mas" id="mas">
+    <summary>Más</summary>
+    <div class="mas-menu">
+      <a href="#progreso" data-view="progreso">Progreso</a>
+      <a href="#secuencias" data-view="secuencias">Secuencias</a>
+      <a href="#datos" data-view="datos">Datos</a>
+      <p class="mas-sync" id="mas-sync"></p>
+      <div class="seg theme" role="group" aria-label="Tema">
+        <button class="seg-btn" data-theme-set="auto" aria-pressed="false">Auto</button>
+        <button class="seg-btn" data-theme-set="light" aria-pressed="false">Claro</button>
+        <button class="seg-btn" data-theme-set="dark" aria-pressed="false">Oscuro</button>
+      </div>
+    </div>
+  </details>
 </header>
-<div class="franja" id="franja" hidden></div>
 
 <main id="main"></main>
 <div class="avisos" id="avisos"></div>

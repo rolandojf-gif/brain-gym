@@ -45,18 +45,30 @@ export function renderRejilla(): string {
   return `
     <figure class="rejilla">
       <div class="rejilla-cab">
-        <span>La rejilla · dilema del prisionero espacial</span>
+        <span>Cooperar o traicionar, en vivo</span>
         <small>Nowak y May, 1992</small>
       </div>
       <canvas class="rejilla-lienzo" width="${ANCHO * 12}" height="${ALTO * 12}" aria-hidden="true"></canvas>
-      <figcaption>Cada celda juega con sus ocho vecinas y copia la estrategia de la que más gana. <b class="c-coopera">Lima</b>: coopera. <b class="c-traiciona">Naranja</b>: acaba de traicionar. Gris: sigue traicionando.</figcaption>
+      <ul class="rejilla-leyenda" aria-label="Qué significa cada color">
+        <li><i class="l-coopera"></i>Coopera</li>
+        <li><i class="l-traiciona"></i>Traiciona</li>
+        <li><i class="l-recientraiciona"></i>Acaba de traicionar</li>
+        <li><i class="l-reciencoopera"></i>Acaba de cooperar</li>
+      </ul>
+      <details class="rejilla-que">
+        <summary>¿Qué estás viendo?</summary>
+        <p>Cada cuadro es un jugador. En cada ronda juega el dilema del prisionero con sus ocho vecinos: si los dos cooperan, ganan 1 cada uno; si uno traiciona a un cooperador, el traidor se lleva el premio por traicionar y el otro, nada; entre dos traidores, nadie gana.</p>
+        <p>Nadie piensa ni recuerda: tras cada ronda, cada cuadro copia lo que hizo el vecino que más ganó.</p>
+        <p>Lo que se ve: los cooperadores sobreviven en grupos, porque dentro del grupo se benefician entre ellos; en los bordes los traidores se aprovechan. Por eso los bordes nunca se quedan quietos. Mezclados al azar, en cambio, ganarían siempre los traidores.</p>
+      </details>
       <div class="rejilla-mandos">
         <div class="rejilla-b">
-          <label for="rejilla-b">Tentación de traicionar · <span class="param">b</span> = <output data-b>${textoB(e.b)}</output></label>
-          <input id="rejilla-b" type="range" min="${TENTACION_MIN}" max="${TENTACION_MAX}" step="0.05" value="${e.b}" data-accion="rejilla-b">
+          <label for="rejilla-b">Premio por traicionar: <output data-b>${textoB(e.b)}</output></label>
+          <input id="rejilla-b" type="range" min="${TENTACION_MIN}" max="${TENTACION_MAX}" step="0.05" value="${e.b}" data-accion="rejilla-b" aria-describedby="rejilla-b-pista">
+          <small id="rejilla-b-pista">Por debajo de 1,8 ganan los cooperadores; por encima de 2, los traidores; entre medias, conviven.</small>
         </div>
         <div class="rejilla-botones">
-          <button type="button" class="btn oscuro" data-accion="rejilla-sembrar">Sembrar un traidor</button>
+          <button type="button" class="btn oscuro" data-accion="rejilla-sembrar" title="Convierte en traidor a un cooperador al azar">Meter un traidor</button>
           <button type="button" class="btn primario" data-accion="rejilla-pausa" aria-pressed="${e.pausa}">${e.pausa ? 'Seguir' : 'Pausar'}</button>
         </div>
       </div>

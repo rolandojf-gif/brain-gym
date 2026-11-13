@@ -64,12 +64,12 @@ function renderCola(ctx: Ctx): string {
   const idsVivos = new Set(vivas.map((l) => l.id));
   const faltanSemillas = LECTURAS_SEMILLA.some((s) => !idsVivos.has(s.id));
   const btnRescate = faltanSemillas
-    ? `<div class="acciones"><button type="button" class="btn sutil" data-accion="cargar-recomendadas">[ Cargar lecturas recomendadas (12 lecturas base) ]</button></div>`
+    ? `<div class="acciones"><button type="button" class="btn sutil" data-accion="cargar-recomendadas">Cargar lecturas recomendadas (12 lecturas base)</button></div>`
     : '';
   const titulo = (id: string) => vivas.find((l) => l.id === id)?.titulo ?? ctx.datos.lecturas.find((l) => l.id === id)?.titulo ?? 'Lectura';
   return `
     ${cabecera('Lectura · Extracción 3x1', 'Lee con foco y extrae de memoria 3 piezas quirúrgicas (máx. ~40 palabras por campo): tesis, mecanismo y punto ciego.')}
-    ${porEscribir.length ? `<h2 class="sec">Pendiente de síntesis 3x1</h2><ul class="lista">${porEscribir.map((l) => `
+    ${porEscribir.length ? `<h2 class="sec">Leídas, sin 3x1 todavía</h2><ul class="lista">${porEscribir.map((l) => `
       <li><div class="li-main"><b>${esc(l.titulo)}</b><span class="m-sub">${meta(l)}${l.leidaEl ? ` · leída ${esc(fmtRelativo(l.leidaEl, ctx.hoy))}` : ''}</span></div>
       <div class="li-acc"><a class="btn primario" href="#lectura/escribir/${esc(l.id)}">Escribir 3x1 sin mirar</a></div></li>`).join('')}</ul>` : ''}
 
@@ -140,7 +140,7 @@ function renderAbogadoDelDiablo(ctx: Ctx, e: Escrito, l: Lectura | undefined): s
       <div class="ia-cta">
         <div class="acciones">
           <button type="button" class="btn primario" data-accion="auditar-ia" data-id="${esc(e.id)}"${cargando ? ' disabled' : ''}>
-            ${cargando ? '[ Auditando fisuras lógicas... ]' : '[ ⚡ Pasar por el Abogado del Diablo (IA) ]'}
+            ${cargando ? 'Auditando fisuras lógicas...' : '⚡ Pasar por el Abogado del Diablo (IA)'}
           </button>
         </div>
         ${err ? `<p class="ia-error" role="alert">${esc(err)}</p>` : ''}
@@ -150,7 +150,7 @@ function renderAbogadoDelDiablo(ctx: Ctx, e: Escrito, l: Lectura | undefined): s
   const fb = e.feedbackIa;
   // Las auditorías guardadas con el antiguo «fallback» de texto libre salieron rotas (el razonamiento del modelo).
   const rota = fb.contraataque === CONTRAATAQUE_ROTO;
-  const repetir = `<button type="button" class="btn ${rota ? 'primario' : 'sutil'}" data-accion="auditar-ia" data-id="${esc(e.id)}"${cargando ? ' disabled' : ''}>${cargando ? '[ Auditando… ]' : 'Repetir auditoría'}</button>`;
+  const repetir = `<button type="button" class="btn ${rota ? 'primario' : 'sutil'}" data-accion="auditar-ia" data-id="${esc(e.id)}"${cargando ? ' disabled' : ''}>${cargando ? 'Auditando…' : 'Repetir auditoría'}</button>`;
   if (rota) {
     return `
       <div class="ia-cta">
@@ -172,7 +172,7 @@ function renderAbogadoDelDiablo(ctx: Ctx, e: Escrito, l: Lectura | undefined): s
         : `<form class="ad-tarjeta form-bloque" data-accion="guardar-propuesta" data-id="${esc(e.id)}" data-i="${i}">
             <label class="campo">Pregunta<textarea name="pregunta" rows="2" required>${esc(t.pregunta)}</textarea></label>
             <label class="campo">Respuesta<textarea name="respuesta" rows="2" required>${esc(t.respuesta)}</textarea></label>
-            <div class="acciones"><button class="btn primario">[ Guardar tarjeta ]</button></div>
+            <div class="acciones"><button class="btn primario">Guardar tarjeta</button></div>
           </form>`,
     )
     .join('');
@@ -224,7 +224,7 @@ function renderReplica(e: Escrito, fb: FeedbackIa): string {
       <label class="campo"><span class="ad-lbl">TU RÉPLICA (OPCIONAL, UN ASALTO):</span>
         <textarea name="replica" rows="3" maxlength="${MAX_CARACTERES_TEXTO_REPLICA}" required placeholder="Defiende tu síntesis o concede. Una o dos frases."${cargando ? ' disabled' : ''}>${esc(borradorReplica.get(e.id) ?? '')}</textarea>
       </label>
-      <div class="acciones"><button class="btn"${cargando ? ' disabled' : ''}>${cargando ? '[ Esperando respuesta… ]' : '[ Replicar ]'}</button></div>
+      <div class="acciones"><button class="btn"${cargando ? ' disabled' : ''}>${cargando ? 'Esperando respuesta…' : 'Replicar'}</button></div>
     </form>`;
 }
 

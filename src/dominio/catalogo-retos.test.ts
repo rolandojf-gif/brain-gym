@@ -207,8 +207,8 @@ describe('catalogo-retos', () => {
     expect(html).toContain(`Marcaste la opción ${c} (trampa); la jugada óptima era la ${d}`);
     expect(html).toContain(insp.reto.solucion);
     expect(html).toContain(insp.reto.modeloMental);
-    expect(html).toContain('[ + Crear tarjeta FSRS con esta regla ]');
-    expect(html).toContain('[ Reintentar reto ]');
+    expect(html).toContain('>+ Crear tarjeta FSRS con esta regla<');
+    expect(html).toContain('>Reintentar reto<');
     expect(html).toContain('Lo que escribiste: «Equilibrio de Nash en cero»');
   });
 
