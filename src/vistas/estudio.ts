@@ -133,7 +133,7 @@ function renderReportar(reto: Reto, desdeElRing: boolean): string {
           <input name="nota" maxlength="300" autocomplete="off" placeholder="Dos opciones valen, la fuente no dice eso…">
         </label>
         <p class="m-sub">Sale de las estadísticas y no se vuelve a ofrecer.${desdeElRing ? ' Tu jugada se guarda igualmente.' : ''}</p>
-        <div class="acciones"><button class="btn">[ Marcar como erróneo ]</button></div>
+        <div class="acciones"><button class="btn">Marcar como erróneo</button></div>
       </form>
     </details>`;
 }
@@ -145,7 +145,7 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
   const bloque = BLOQUES_RETOS.find((b) => b.id === reto.bloque);
   const tagPrevio = estadoPrevio
     ? `<span class="tag e-${estadoPrevio}">${esc(ETIQUETA_ESTADO[estadoPrevio])}</span>`
-    : '<span class="tag">Pendiente</span>';
+    : '<span class="tag">Sin jugar</span>';
 
   const bloqueOpciones = opcionesVisibles(reto)
     .map((op) => {
@@ -168,7 +168,7 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
   const paso1Acciones =
     est.paso === 1
       ? `<div class="acciones">
-           <button type="submit" class="btn primario">[ Fijar mi jugada ]</button>
+           <button type="submit" class="btn primario">Fijar mi jugada</button>
          </div>`
       : '';
 
@@ -185,8 +185,8 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
            ${
              est.paso === 2
                ? `<div class="acciones">
-                    ${!est.pistaDesbloqueada ? `<button type="button" class="btn" data-accion="desbloquear-pista">[ Desbloquear pista ]</button>` : ''}
-                    <button type="button" class="btn primario" data-accion="ver-resolucion">[ Ver resolución ]</button>
+                    ${!est.pistaDesbloqueada ? `<button type="button" class="btn" data-accion="desbloquear-pista">Desbloquear pista</button>` : ''}
+                    <button type="button" class="btn primario" data-accion="ver-resolucion">Ver resolución</button>
                   </div>`
                : ''
            }
@@ -214,7 +214,7 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
            </div>
            ${renderFuente(reto)}
            <div class="acciones reto-cierre">
-             <button type="button" class="btn primario" data-accion="guardar-reto">${estadoFinal === 'solucion' ? '[ Guardar y crear tarjeta de repaso ]' : '[ Guardar y seguir ]'}</button>
+             <button type="button" class="btn primario" data-accion="guardar-reto">${estadoFinal === 'solucion' ? 'Guardar y crear tarjeta de repaso' : 'Guardar y seguir'}</button>
              <span class="m-sub">${reto.debate ? 'Debate: no cuenta en las estadísticas.' : `Se guarda como: ${esc(ETIQUETA_ESTADO[estadoFinal])}.`}</span>
            </div>
            ${renderReportar(reto, true)}
@@ -247,7 +247,7 @@ function renderAcordeon(reto: Reto, est: EstadoAcordeon, estadoPrevio: EstadoInt
                  <input name="respuesta" value="${esc(est.respuestaLibre)}" maxlength="300" placeholder="Con tus palabras, antes de que las opciones te sugieran nada…" autocomplete="off">
                </label>
                <div class="acciones">
-                 <button type="submit" class="btn primario">[ Ver opciones ]</button>
+                 <button type="submit" class="btn primario">Ver opciones</button>
                </div>
              </form>`
       }
@@ -329,9 +329,9 @@ export function renderPanelRevision(ctx: Ctx, insp: InspeccionReto): string {
         ${
           tieneTarjeta
             ? '<span class="tag e-sin_ayuda">✓ Tarjeta FSRS ya en tu mazo</span>'
-            : `<button type="button" class="btn primario" data-accion="crear-tarjeta-reto" data-id="${esc(reto.id)}">[ + Crear tarjeta FSRS con esta regla ]</button>`
+            : `<button type="button" class="btn primario" data-accion="crear-tarjeta-reto" data-id="${esc(reto.id)}">+ Crear tarjeta FSRS con esta regla</button>`
         }
-        <button type="button" class="btn" data-accion="reintentar-reto" data-id="${esc(reto.id)}">[ Reintentar reto ]</button>
+        <button type="button" class="btn" data-accion="reintentar-reto" data-id="${esc(reto.id)}">Reintentar reto</button>
         <button type="button" class="btn sutil" data-accion="toggle-revision" data-id="${esc(reto.id)}">Cerrar análisis</button>
       </div>
       ${renderReportar(reto, false)}
@@ -350,7 +350,7 @@ function filaIntento(ctx: Ctx, todos: readonly Reto[], i: Intento): string {
   const tarjeta = ctx.datos.tarjetas.find((t) => !t.borrado && (t.id === i.tarjetaId || (t.origen?.coleccion === 'intentos' && t.origen.id === i.id)));
   const abierto = reto ? revisionesAbiertas.has(reto.id) : false;
   const verAnalisis = reto
-    ? `<button type="button" class="btn ${abierto ? 'primario' : 'sutil'}" data-accion="toggle-revision" data-id="${esc(reto.id)}">${abierto ? 'Ocultar análisis' : '[ Ver análisis / Repasar ]'}</button>`
+    ? `<button type="button" class="btn ${abierto ? 'primario' : 'sutil'}" data-accion="toggle-revision" data-id="${esc(reto.id)}">${abierto ? 'Ocultar análisis' : 'Ver análisis / Repasar'}</button>`
     : '';
   const crear = i.estado !== 'sin_ayuda' && !tarjeta && !reto ? `<a class="btn sutil" href="#repaso/nueva/intentos/${esc(i.id)}">Crear tarjeta</a>` : '';
   return `
@@ -438,14 +438,14 @@ export const estudio: Vista = {
                   <li class="${claseItem}" id="cat-reto-${esc(r.id)}">
                     <div class="li-fila">
                       <div class="li-main" ${insp ? `data-accion="toggle-revision" data-id="${esc(r.id)}" role="button" tabindex="0"` : ''}>
-                        <b>${r.generado ? '' : `${esc(r.id)} · `}${esc(r.titulo)} ${r.generado ? '<span class="tag">IA</span> ' : ''}${r.generado?.reportado ? '<span class="tag e-solucion">Erróneo</span> ' : ''}${st ? `<span class="tag e-${st}">${esc(ETIQUETA_ESTADO[st])}</span>` : '<span class="tag">Pendiente</span>'}</b>
+                        <b>${r.generado ? '' : `${esc(r.id)} · `}${esc(r.titulo)} ${r.generado ? '<span class="tag">IA</span> ' : ''}${r.generado?.reportado ? '<span class="tag e-solucion">Erróneo</span> ' : ''}${st ? `<span class="tag e-${st}">${esc(ETIQUETA_ESTADO[st])}</span>` : '<span class="tag">Sin jugar</span>'}</b>
                         ${insp ? `<span class="m-sub">${resumenInspeccion(insp)} · Clic para ${abierto ? 'ocultar' : 'inspeccionar análisis y regla'}</span>` : ''}
                       </div>
                       <div class="li-acc">
                         ${
                           insp
-                            ? `<button type="button" class="btn ${abierto ? 'primario' : ''}" data-accion="toggle-revision" data-id="${esc(r.id)}" aria-expanded="${abierto}">${abierto ? 'Ocultar análisis' : '[ Ver análisis / Repasar ]'}</button>
-                               <button type="button" class="btn sutil" data-accion="reintentar-reto" data-id="${esc(r.id)}">[ Reintentar reto ]</button>`
+                            ? `<button type="button" class="btn ${abierto ? 'primario' : ''}" data-accion="toggle-revision" data-id="${esc(r.id)}" aria-expanded="${abierto}">${abierto ? 'Ocultar análisis' : 'Ver análisis / Repasar'}</button>
+                               <button type="button" class="btn sutil" data-accion="reintentar-reto" data-id="${esc(r.id)}">Reintentar reto</button>`
                             : `<button type="button" class="btn ${activo ? 'primario' : 'sutil'}" data-accion="elegir-reto" data-id="${esc(r.id)}">${activo ? 'En juego' : 'Jugar'}</button>`
                         }
                       </div>
@@ -466,7 +466,7 @@ export const estudio: Vista = {
           ${bloquesFiltro.map((b) => `<button class="seg-btn" data-accion="filtrar-bloque" data-bloque="${esc(b.id)}" aria-pressed="${filtroBloque === b.id}">${esc(b.texto)}</button>`).join('')}
         </div>
 
-        <h2 class="sec">Siguiente reto pendiente</h2>
+        <h2 class="sec">Siguiente reto</h2>
         ${renderAcordeon(reto, est, estadoPrevio, pideConfianza(reto, intentos))}
 
         <h2 class="sec">Todos los retos (${CATALOGO_RETOS.length} del catálogo${generados > 0 ? ` · ${generados} generados por IA` : ''})</h2>

@@ -12,15 +12,16 @@ Web personal de un solo usuario para aprender por curiosidad sobre **Teoría de 
 6. Los datos son del usuario: exportación e importación completas siempre funcionando y retrocompatibles.
 7. Interfaz en español impecable, directo y sin paja.
 
-## Navegación (6 pestañas)
+## Navegación (4 pestañas y un menú «Más»)
 
-- `01 Hoy` (`#hoy`): menú de tres tarjetas (un reto destacado con tema rotativo, selector y «¿Qué harías tú?», una lectura, una idea convertible en tarjeta), la rejilla viva del dilema del prisionero espacial y un aviso discreto si hay tarjetas vencidas.
-- `02 Retos` (`#estudio`): Ring de sparring con acordeón de 3 pasos. Cinco temas: el catálogo integrado de 32 retos en los cuatro primeros y retos generados por IA en todos (la carrera por la AGI, sólo generados), alternando catálogo y generados. El estado lo deduce la app; los retos de debate y los generados marcados como erróneos no cuentan en las estadísticas.
-- `03 Lectura` (`#lectura`): Extracción Quirúrgica 3x1 (Tesis central, Mecanismo/Incentivo, Punto ciego/Objeción; máx. ~40 palabras por campo).
-- `04 Repaso` (`#repaso`): Mazo FSRS (`ts-fsrs`) alimentado desde los retos fallados, lecturas y aprendizajes diarios.
-- `05 Progreso` (`#progreso`): retos jugados por tema, tarjetas aprendidas y retención, lecturas e ideas, y calibración en retos (Brier, sesgo y margen de ruido). Sin calendario ni tasas de acierto.
-- `06 Datos` (`#datos`): Sincronización entre dispositivos, exportación/importación JSON y hora de corte del día.
-- Sin pestaña: `#secuencias`, juego de atención sostenida (inspirado en el RVP de Cambridge) al que se entra desde un enlace discreto en Hoy. No guarda nada.
+- `Hoy` (`#hoy`): menú de tres tarjetas (un reto destacado con tema rotativo, selector y «¿Qué harías tú?», una lectura, una idea convertible en tarjeta), la rejilla viva del dilema del prisionero espacial y un aviso discreto si hay tarjetas vencidas.
+- `Retos` (`#estudio`): Ring de sparring con acordeón de 3 pasos. Cinco temas: el catálogo integrado de 32 retos en los cuatro primeros y retos generados por IA en todos (la carrera por la AGI, sólo generados), alternando catálogo y generados. El estado lo deduce la app; los retos de debate y los generados marcados como erróneos no cuentan en las estadísticas.
+- `Lectura` (`#lectura`): Extracción Quirúrgica 3x1 (Tesis central, Mecanismo/Incentivo, Punto ciego/Objeción; máx. ~40 palabras por campo).
+- `Repaso` (`#repaso`): Mazo FSRS (`ts-fsrs`) alimentado desde los retos fallados, lecturas y aprendizajes diarios.
+- Menú «Más» de la cabecera: `Progreso` (`#progreso`): retos jugados por tema, tarjetas aprendidas y retención, lecturas e ideas, y calibración en retos (Brier, sesgo y margen de ruido). Sin calendario ni tasas de acierto.
+- Menú «Más»: `Datos` (`#datos`): sincronización entre dispositivos, exportación/importación JSON y hora de corte del día.
+- Menú «Más»: `Secuencias` (`#secuencias`), juego de atención sostenida (inspirado en el RVP de Cambridge), también con un enlace discreto en Hoy. No guarda nada.
+- El menú «Más» lleva además el estado de la sincronización y el selector de tema. Si la sincronización falla, sale un aviso en la cabecera.
 
 ## Stack
 

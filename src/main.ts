@@ -1,11 +1,8 @@
-/* BRAIN.GYM — arranque, navegación por hash, tema, franja de estado y avisos. */
+/* BRAIN.GYM — arranque, navegación por hash, tema, estado de la sincronización y avisos. */
 import './styles/base.css';
 import { App, type Vista } from './app';
 import { Almacen } from './datos/almacen';
-import { fmtReloj } from './lib/fmt';
 import { esc } from './lib/html';
-import * as temporizador from './lib/temporizador';
-import { NOMBRE_ACTIVIDAD } from './vistas/comun';
 import { datos } from './vistas/datos';
 import { estudio } from './vistas/estudio';
 import { hoy } from './vistas/hoy';
@@ -59,7 +56,9 @@ function pintar(forzar = false): void {
   main.innerHTML = vista.render(ctx);
   const raiz = main.firstElementChild;
   if (raiz instanceof HTMLElement) vista.montar?.(ctx, raiz);
-  $$<HTMLAnchorElement>('.navtab[data-view]').forEach((a) => (a.dataset.view === nombre ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
+  $$<HTMLAnchorElement>('.topnav a[data-view]').forEach((a) => (a.dataset.view === nombre ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
+  // «Más» se marca cuando la vista abierta vive en su menú.
+  $('#mas')?.classList.toggle('activa', Boolean($(`.mas-menu a[data-view="${nombre}"]`)));
   document.title = `${vista.titulo} · BRAIN.GYM`;
   if (nombre !== vistaActual) {
     vistaActual = nombre;
@@ -67,16 +66,25 @@ function pintar(forzar = false): void {
   }
 }
 
-/** Franja bajo la cabecera: temporizador en marcha y estado de la sincronización. */
+/**
+ * Estado de la sincronización: siempre en el menú «Más» y, sólo si algo falla, como aviso en la cabecera. Que
+ * funcione no necesita pantalla; que falle, sí.
+ */
 function pintarEstado(): void {
-  const el = $<HTMLElement>('#franja');
-  if (!el || !app) return;
-  const t = temporizador.actual();
-  const crono = t ? `<span class="crono">● ${esc(NOMBRE_ACTIVIDAD[t.actividad])} <b>${fmtReloj((Date.now() - t.inicio) / 1000)}</b></span>` : '';
+  if (!app) return;
   const s = app.sync;
-  const sync = s.texto ? `<span class="st-${s.tipo}">${esc(s.texto)}</span>` : '';
-  el.innerHTML = `${crono}${sync}<a class="ir-datos" href="#datos">Datos</a>`;
-  el.hidden = !crono && !sync;
+  const enMenu = $<HTMLElement>('#mas-sync');
+  if (enMenu) {
+    enMenu.textContent = s.texto;
+    enMenu.className = `mas-sync st-${s.tipo}`;
+  }
+  const aviso = $<HTMLAnchorElement>('#aviso-sync');
+  if (!aviso) return;
+  const falla = s.tipo === 'error' || s.tipo === 'aviso';
+  aviso.hidden = !falla;
+  aviso.className = `aviso-sync st-${s.tipo}`;
+  aviso.textContent = falla ? s.texto : '';
+  aviso.title = falla ? `${s.texto}. Abre Datos para revisarlo.` : '';
 }
 
 function avisar(texto: string, tipo: 'ok' | 'error' = 'ok'): void {
@@ -100,18 +108,27 @@ function initTheme(): void {
   sync();
 }
 
-/* Altura de la cabecera fija, para colocar la franja de estado justo debajo. */
-function seguirCabecera(): void {
-  const nav = $<HTMLElement>('.topnav');
-  if (!nav) return;
-  const fijar = () => document.documentElement.style.setProperty('--top-h', `${Math.round(nav.getBoundingClientRect().height)}px`);
-  fijar();
-  new ResizeObserver(fijar).observe(nav);
+/* El menú «Más» se cierra al elegir algo, al pulsar fuera o con Escape. */
+function initMenuMas(): void {
+  const mas = $<HTMLDetailsElement>('#mas');
+  if (!mas) return;
+  mas.addEventListener('click', (e) => {
+    if ((e.target as Element).closest('.mas-menu a')) mas.open = false;
+  });
+  document.addEventListener('click', (e) => {
+    if (mas.open && !mas.contains(e.target as Node)) mas.open = false;
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && mas.open) {
+      mas.open = false;
+      mas.querySelector('summary')?.focus();
+    }
+  });
 }
 
 async function main(): Promise<void> {
   initTheme();
-  seguirCabecera();
+  initMenuMas();
   let almacen: Almacen;
   try {
     almacen = await Almacen.abrir();
@@ -130,7 +147,6 @@ async function main(): Promise<void> {
     if (pintadoPendiente) pintar();
     void app.sincronizar();
   });
-  setInterval(pintarEstado, 1000);
   pintar(true);
   void app.sincronizar();
   // Sólo en producción: en desarrollo, la caché del service worker escondería los cambios.

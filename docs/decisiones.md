@@ -76,3 +76,12 @@ Rolando pidió una tarea tipo RVP (Rapid Visual Information Processing, Cambridg
 - **Datos:** no se guarda nada; al acabar, un resumen (aciertos, omisiones, falsas alarmas, reacción mediana, ritmo). Guardar un historial exigiría una colección nueva y subir el esquema.
 - **Móvil:** botón táctil grande que responde al tocar (`pointerdown`), no al levantar el dedo.
 
+## D9. Orden de la navegación · decidida (13 nov 2026)
+
+Tras la semana de uso, la web se sentía «en construcción» y caótica. Rolando aceptó la propuesta entera:
+
+- **Cuatro pestañas sin números:** Hoy, Retos, Lectura y Repaso, lo que se usa a diario. Progreso, Secuencias, Datos y el selector de tema van en un menú «Más» de la cabecera.
+- **Fuera la franja negra:** el estado de la sincronización se ve dentro de «Más» y sólo sale en la cabecera, como aviso, si falla. El temporizador de actividad ya no se arrancaba desde ninguna vista y deja de pintarse.
+- **Botones sin corchetes** en todas las vistas, como ya pasaba en Hoy.
+- **Sin «pendiente»:** en Retos, «Sin jugar» y «Siguiente reto»; en Lectura, «Leídas, sin 3x1 todavía».
+- **Rejilla de Hoy comprensible** (Rolando no entendía qué mostraba): leyenda de colores, un «¿Qué estás viendo?» desplegable y mandos con nombres claros («Premio por traicionar», «Meter un traidor»).

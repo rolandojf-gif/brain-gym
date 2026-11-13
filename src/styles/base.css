@@ -95,10 +95,8 @@ button { cursor: pointer; }
   font: 600 12.5px/1.2 var(--f-mono); white-space: nowrap; text-transform: uppercase;
 }
 .navtab:last-child { border-right: 0; }
-.navtab i { font-style: normal; color: var(--orange-ink); font-weight: 700; }
 .navtab:hover { background: rgba(204, 255, 0, .3); }
 .navtab[aria-current="page"] { background: var(--lime); color: #121211; }
-.navtab[aria-current="page"] i { color: #121211; }
 
 .seg { display: inline-flex; flex-wrap: wrap; border: 2px solid var(--ink); box-shadow: var(--shadow-sm); background: var(--card); }
 .seg-btn { font: 700 11.5px/1.2 var(--f-mono); padding: 8px 11px; border: 0; border-right: 2px solid var(--ink); background: transparent; text-transform: uppercase; }
@@ -116,21 +114,40 @@ h2.sec::before { content: ''; width: 14px; height: 14px; background: var(--orang
 .panel { background: var(--card); border: 2px solid var(--ink); box-shadow: var(--shadow); padding: 16px; }
 .empty { background: var(--card); border: 2px dashed var(--ink); padding: 18px; font-size: 15px; }
 
-/* ── Franja de estado y avisos ────────────────────────────────────────── */
-.franja {
-  position: sticky; top: var(--top-h, 71px); z-index: 40;
-  display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center;
-  padding: 7px max(24px, calc((100% - 1200px) / 2 + 24px)); background: var(--asphalt); color: #E8E7E1;
-  font: 600 12px/1.4 var(--f-mono); border-bottom: 2px solid #000;
+/* ── Estado de la sincronización, menú «Más» y avisos ────────────────── */
+/* Sólo aparece si la sincronización falla; si funciona, se ve dentro de «Más». */
+.aviso-sync {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 280px;
+  padding: 6px 10px; border: 2px solid var(--ink); background: var(--card);
+  font: 600 12px/1.3 var(--f-mono); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.franja[hidden] { display: none; }
-.franja .crono b { color: var(--lime); font-variant-numeric: tabular-nums; }
-.franja .crono { color: var(--lime); }
-.franja .st-ok { color: #34D399; }
-.franja .st-aviso { color: #FBBF24; }
-.franja .st-error { color: #FF5C7A; }
-.franja .st-apagado { color: #9C9B95; }
-.franja .ir-datos { margin-left: auto; color: var(--lime); text-decoration: none; border: 1px solid var(--lime); padding: 1px 8px; }
+.aviso-sync[hidden] { display: none; }
+.aviso-sync::before { content: ''; flex: none; width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+.st-ok { color: var(--ok); }
+.st-aviso { color: var(--warn); }
+.st-error { color: var(--bad); }
+.st-apagado { color: var(--muted); }
+.mas { position: relative; flex: none; }
+.mas > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 9px 14px;
+  border: 2px solid var(--ink); background: var(--card); box-shadow: var(--shadow-sm);
+  font: 600 12.5px/1.2 var(--f-mono); text-transform: uppercase;
+}
+.mas > summary::-webkit-details-marker { display: none; }
+.mas > summary::after { content: '▾'; font-size: 11px; }
+.mas[open] > summary::after { content: '▴'; }
+.mas > summary:hover { background: rgba(204, 255, 0, .3); }
+.mas.activa > summary { background: var(--lime); color: #121211; }
+.mas-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; min-width: 230px;
+  display: flex; flex-direction: column; background: var(--card); border: 2px solid var(--ink); box-shadow: var(--shadow);
+}
+.mas-menu > a { padding: 12px 14px; border-bottom: 2px solid var(--ink); text-decoration: none; font: 600 13px/1.2 var(--f-mono); text-transform: uppercase; }
+.mas-menu > a:hover { background: rgba(204, 255, 0, .3); }
+.mas-menu > a[aria-current="page"] { background: var(--lime); color: #121211; }
+.mas-sync { margin: 0; padding: 10px 14px 4px; font: 600 12px/1.4 var(--f-mono); }
+.mas-sync:empty { display: none; }
+.mas-menu .seg.theme { margin: 10px 14px 14px; align-self: flex-start; }
 .avisos { position: fixed; z-index: 300; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; width: min(520px, calc(100vw - 28px)); }
 .aviso { background: var(--card); border: 2px solid var(--ink); box-shadow: var(--shadow); padding: 10px 14px; font-size: 14.5px; }
 .aviso.ok { border-left: 8px solid var(--ok); }
@@ -200,14 +217,22 @@ table.plan thead th { font: 700 11px var(--f-mono); text-transform: uppercase; b
 .rejilla-cab { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; font: 700 12px/1.2 var(--f-mono); color: var(--lime); letter-spacing: .05em; text-transform: uppercase; }
 .rejilla-cab small { font-weight: 400; color: #9C9B95; letter-spacing: 0; text-transform: none; }
 .rejilla-lienzo { display: block; width: 100%; height: auto; background: #0F0F0E; }
-.rejilla figcaption { font-size: 14px; line-height: 1.5; color: #C9C8C2; }
-.rejilla .c-coopera { color: var(--lime); }
-.rejilla .c-traiciona { color: #FF8A5C; }
+.rejilla-leyenda { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font: 600 12px/1.3 var(--f-mono); color: #E8E7E1; }
+.rejilla-leyenda li { display: inline-flex; align-items: center; gap: 7px; }
+.rejilla-leyenda i { width: 12px; height: 12px; flex: none; }
+/* Los mismos colores que dibuja el canvas (src/vistas/rejilla.ts). */
+.l-coopera { background: #CCFF00; }
+.l-traiciona { background: #2E2E2A; outline: 1px solid #6B6A64; }
+.l-recientraiciona { background: #FF5722; }
+.l-reciencoopera { background: #EEFFAA; }
+.rejilla-que { font-size: 14px; line-height: 1.55; color: #C9C8C2; }
+.rejilla-que summary { cursor: pointer; width: fit-content; font: 700 12.5px/1.3 var(--f-mono); color: var(--lime); text-decoration: underline; text-underline-offset: 3px; }
+.rejilla-que p { margin: 8px 0 0; }
 .rejilla-mandos { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 18px; }
 .rejilla-b { flex: 1 1 240px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .rejilla-b label { color: #E8E7E1; }
 .rejilla-b output { color: var(--lime); }
-.rejilla-b .param { text-transform: none; }
+.rejilla-b small { font-size: 12.5px; line-height: 1.4; color: #B5B4AE; }
 .rejilla-b input[type="range"] { width: 100%; min-height: 0; height: 24px; padding: 0; border: 0; background: transparent; accent-color: var(--lime); }
 .rejilla-botones { display: flex; flex-wrap: wrap; gap: 10px; }
 .btn.oscuro { background: transparent; color: #E8E7E1; border-color: #E8E7E1; box-shadow: none; }
@@ -412,10 +437,10 @@ table.cap td { padding: 6px 8px; }
   .brand-text strong { font-size: 20px; }
   .brand-icon { width: 38px; height: 38px; font-size: 15px; }
   .navtabs { order: 3; width: 100%; margin: 0; box-shadow: var(--shadow-sm); }
-  .seg.theme { margin-left: auto; }
-  .navtab { padding: 11px 12px; }
+  .navtab { flex: 1; justify-content: center; padding: 11px 8px; }
+  .mas { margin-left: auto; }
+  .aviso-sync { order: 4; max-width: 100%; }
   main { padding: 20px 14px 48px; }
-  .franja { padding: 7px 14px; }
   .seg-btn { padding: 7px 8px; }
 }
 
