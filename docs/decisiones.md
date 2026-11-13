@@ -90,7 +90,7 @@ Tras la semana de uso, la web se sentía «en construcción» y caótica. Roland
 
 Preguntas propias en cuatro pasos, como en el plan: hipótesis antes de mirar nada, exploración con IA, «lo que me llevo» en una o dos frases y tarjeta de repaso con un toque.
 
-- **Dónde viven (recomendación, pendiente de la tarjeta de decisión):** la tercera tarjeta de Hoy pasa de «Una idea» a «Una curiosidad». Si hay una pregunta abierta, ofrece retomarla; si no, invita a apuntar una. La lista completa (`#curiosidades`) se abre desde esa tarjeta y desde el menú «Más». Las ideas ya guardadas se conservan, siguen en Repaso y cuentan en Progreso; «lo que me llevo» ocupa su lugar.
+- **Dónde viven (Rolando eligió la recomendación):** la tercera tarjeta de Hoy pasa de «Una idea» a «Una curiosidad». Si hay una pregunta abierta, ofrece retomarla; si no, invita a apuntar una. La lista completa (`#curiosidades`) se abre desde esa tarjeta y desde el menú «Más». Las ideas ya guardadas se conservan, siguen en Repaso y cuentan en Progreso; «lo que me llevo» ocupa su lugar.
 - **La hipótesis es obligatoria para explorar** (principio 3): sin ella, `/api/explorar` responde 400. «No lo sé, pero sospecho que…» vale. Se guarda antes de llamar a la IA, para que un fallo no la borre, y queda fija tras la exploración.
 - **Fuentes verificadas:** el servidor pide cada URL propuesta y sólo devuelve las que responden, con la misma regla que las fuentes de los retos. Si ninguna responde, la exploración se enseña sin fuentes y lo dice.
 - **Cupo:** una llamada por exploración, del cupo diario general (la pide el usuario, como el Abogado del Diablo). Se puede repetir mientras no se haya escrito «lo que me llevo».
