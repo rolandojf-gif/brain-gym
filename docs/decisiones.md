@@ -97,3 +97,12 @@ Preguntas propias en cuatro pasos, como en el plan: hipótesis antes de mirar na
 - **Sin estado «pendiente»:** el paso se deduce de lo escrito (`pasoCuriosidad`).
 - **Modelo de datos v3:** colección nueva `curiosidades`; migración 2 → 3 y tienda nueva en IndexedDB (versión 3).
 
+## D11. La web se acuerda de ti · decidida (13 nov 2026)
+
+A la web le faltaba «una pizca de encanto». De tres propuestas (momentos con ceremonia, la web se acuerda de ti, algo nuevo cada día), Rolando eligió la segunda.
+
+- **Qué es:** en Hoy, entre la rejilla y las tarjetas, un fragmento que escribiste hace tiempo junto a lo que resultó: lo que dijiste que harías en un reto (con el resultado y su modelo mental), tu objeción a una lectura (con la respuesta del Abogado del Diablo), la hipótesis de una curiosidad (con lo que te llevaste) o una idea apuntada.
+- **Cuál sale:** uno por día, el mismo todo el día (`recuerdoDelDia`). Prefiere los de hace una semana o más y los que tienen desenlace; si no hay ninguno tan antiguo, uno de días anteriores; sin nada que recordar, no se pinta. «Otro recuerdo» pasa al siguiente sin guardar nada.
+- **Sin datos nuevos:** sale de lo que ya se guarda (`src/dominio/recuerdos.ts`); no hay colección ni cambio de esquema. No es una métrica ni un deber (principios 1 y 2).
+- Quedan como posibles peldaños siguientes las otras dos propuestas.
+

@@ -208,6 +208,16 @@ table.plan thead th { font: 700 11px var(--f-mono); text-transform: uppercase; b
 .chip-juego { align-self: flex-start; font: 600 12.5px/1.3 var(--f-mono); color: var(--muted); text-decoration: none; border-bottom: 1px dashed var(--muted); }
 .chip-juego:hover { color: var(--text); border-bottom-color: var(--text); }
 
+/* El recuerdo: tu voz de hace un tiempo. Papel con una banda lima, la cita grande y el desenlace debajo. */
+.recuerdo { grid-column: 1 / -1; background: var(--card-2); border: 2px solid var(--ink); border-left: 10px solid var(--lime); padding: 18px 22px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.recuerdo blockquote { margin: 0; font: 700 clamp(19px, 2.2vw, 25px)/1.3 var(--f-head); letter-spacing: -.01em; max-width: 60ch; }
+.recuerdo blockquote::before { content: '«'; }
+.recuerdo blockquote::after { content: '»'; }
+.recuerdo-desenlace { margin: 0; font-size: 15.5px; line-height: 1.55; color: var(--text); max-width: 75ch; }
+.recuerdo-pie { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 600 12.5px/1.3 var(--f-mono); }
+.recuerdo-pie a, .recuerdo-pie button { color: var(--muted); background: none; border: 0; border-bottom: 1px dashed var(--muted); padding: 0; font: inherit; cursor: pointer; text-decoration: none; }
+.recuerdo-pie a:hover, .recuerdo-pie button:hover { color: var(--text); border-bottom-color: var(--text); }
+
 /* La rejilla viva: siempre sobre asfalto, en los dos temas. */
 .rejilla {
   grid-column: span 7; min-width: 0; margin: 0; padding: 16px;
@@ -264,8 +274,9 @@ table.plan thead th { font: 700 11px var(--f-mono); text-transform: uppercase; b
   .hoy-grid { grid-template-columns: minmax(0, 1fr); }
   .hoy-saludo, .rejilla, .act-reto, .hoy-lado { grid-column: auto; }
   .act-reto { order: 1; }
-  .rejilla { order: 2; }
-  .hoy-lado { order: 3; }
+  .recuerdo { order: 2; padding: 16px; }
+  .rejilla { order: 3; }
+  .hoy-lado { order: 4; }
 }
 .pendiente { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 .pendiente li { background: var(--card-2); border: 2px solid var(--ink); border-left: 8px solid var(--orange); padding: 10px 14px; }

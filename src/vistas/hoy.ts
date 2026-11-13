@@ -5,6 +5,7 @@ import { accion, campos, type Ctx, type Vista } from '../app';
 import { BLOQUES_RETOS, CATALOGO_RETOS, retosJugables, siguienteRetoPendiente, temaSiguiente, todosLosRetos, type Reto } from '../dominio/catalogo-retos';
 import { ordenarCuriosidades, pasoCuriosidad } from '../dominio/explorar';
 import { vencidas } from '../dominio/fsrs';
+import { haceCuanto, hayOtroRecuerdo, recuerdoDelDia, recuerdos } from '../dominio/recuerdos';
 import { actualizar } from '../dominio/registro';
 import { separarPregunta } from '../dominio/texto';
 import type { TemaReto } from '../dominio/tipos';
@@ -19,6 +20,9 @@ let temaElegido: { id: TemaReto; el: string } | null = null;
 
 /** Lo escrito en «¿Qué harías tú?»: sobrevive a un repintado (una sincronización) mientras sea del mismo reto. */
 let borrador = { retoId: '', texto: '' };
+
+/** Cuántas veces se ha pedido «otro recuerdo» hoy; sólo en memoria: al reabrir vuelve el del día. */
+let saltoRecuerdo = { dia: '', n: 0 };
 
 function temaActual(ctx: Ctx, jugables: readonly Reto[]): TemaReto {
   const rotacion = temaSiguiente(ctx.datos.intentos, jugables);
@@ -124,6 +128,24 @@ function renderCuriosidad(ctx: Ctx): string {
     </article>`;
 }
 
+/* Tu propia voz de hace un tiempo, junto a lo que resultó. Si aún no hay nada que recordar, no se pinta. */
+function renderRecuerdo(ctx: Ctx): string {
+  const todos = recuerdos(ctx.datos, todosLosRetos(ctx.datos.retos));
+  if (saltoRecuerdo.dia !== ctx.hoy) saltoRecuerdo = { dia: ctx.hoy, n: 0 };
+  const r = recuerdoDelDia(todos, ctx.hoy, saltoRecuerdo.n);
+  if (!r) return '';
+  return `
+    <aside class="recuerdo" aria-label="Un recuerdo tuyo">
+      <p class="kicker">${esc(haceCuanto(r.fecha, ctx.hoy))} · ${esc(r.contexto)}</p>
+      <blockquote>${esc(r.tuyo)}</blockquote>
+      ${r.desenlace ? `<p class="recuerdo-desenlace"><b>${esc(r.desenlace.etiqueta)}.</b> ${esc(r.desenlace.texto)}</p>` : ''}
+      <div class="recuerdo-pie">
+        <a href="${esc(r.enlace)}">Volver a verlo →</a>
+        ${hayOtroRecuerdo(todos, ctx.hoy) ? '<button type="button" data-accion="otro-recuerdo">Otro recuerdo</button>' : ''}
+      </div>
+    </aside>`;
+}
+
 export const hoy: Vista = {
   titulo: 'Hoy',
   render(ctx) {
@@ -138,6 +160,7 @@ export const hoy: Vista = {
             <a class="chip-juego" href="#secuencias">Secuencias: un juego de atención →</a>
           </div>
           ${renderRejilla()}
+          ${renderRecuerdo(ctx)}
           ${renderReto(ctx)}
           <div class="hoy-lado">
             ${renderLectura(ctx)}
@@ -149,6 +172,11 @@ export const hoy: Vista = {
   montar(ctx, raiz) {
     montarRejilla(raiz);
     montarApuntar(ctx, raiz);
+
+    accion(raiz, 'click', 'otro-recuerdo', () => {
+      saltoRecuerdo = { dia: ctx.hoy, n: saltoRecuerdo.n + 1 };
+      ctx.pintar();
+    });
 
     accion(raiz, 'input', 'borrador-reto', (el) => {
       borrador = { retoId: el.dataset.id ?? '', texto: (el as HTMLTextAreaElement).value };
