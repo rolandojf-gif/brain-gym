@@ -15,10 +15,9 @@ import {
   validarPeticionReto,
   type PeticionReto,
 } from '../../src/dominio/retos-ia';
-import { ErrorServidor, LIMITE_RETOS, autorizado, json, leerEnv, llamarConCupo } from '../servidor';
+import { ErrorServidor, LIMITE_RETOS, autorizado, comprobarFuente, json, leerEnv, llamarConCupo } from '../servidor';
 
 const MAX_CUERPO = 8000;
-const TIEMPO_FUENTE_MS = 6000;
 
 export default async (req: Request): Promise<Response> => {
   if (req.method !== 'POST') return json({ error: 'Método no permitido' }, 405);
@@ -67,24 +66,4 @@ export const config: Config = { path: '/api/retos' };
 
 function descartado(motivo: 'formato' | 'fuente' | 'revisor', detalle: string): Response {
   return json({ error: `Reto descartado (${motivo}): ${detalle}`, motivo }, 422);
-}
-
-/**
- * ¿La URL existe? Basta con que responda: 2xx/3xx, o 401/403/429 (existe pero bloquea a robots, como muchas revistas).
- * Un 404, un 410, un 5xx o un dominio que no resuelve la descartan. No se lee el cuerpo: sólo importa el código.
- */
-async function comprobarFuente(url: string): Promise<{ ok: boolean; detalle: string }> {
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      redirect: 'follow',
-      signal: AbortSignal.timeout(TIEMPO_FUENTE_MS),
-      headers: { 'User-Agent': 'BrainGym/1.0 (verificacion de fuentes)', Accept: 'text/html,application/xhtml+xml,*/*' },
-    });
-    await res.body?.cancel().catch(() => undefined);
-    const ok = res.status < 400 || [401, 403, 429].includes(res.status);
-    return { ok, detalle: `HTTP ${res.status}` };
-  } catch (e) {
-    return { ok: false, detalle: e instanceof Error ? e.name : 'error de red' };
-  }
 }

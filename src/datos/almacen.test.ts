@@ -132,6 +132,30 @@ describe('Almacen', () => {
     expect((await a.copiaPrevia())?.esquema).toBe(1);
   });
 
+  it('abre una base v2 (IndexedDB 2, esquema 2): crea la tienda de curiosidades y conserva los retos', async () => {
+    const nombre = 'bg-v2';
+    const v2 = ['ajustes', 'fuentes', 'intentos', 'lecturas', 'escritos', 'tarjetas', 'repasos', 'predicciones', 'sesiones', 'aprendizajes', 'retos'];
+    const db = await openDB(nombre, 2, {
+      upgrade(d) {
+        for (const c of v2) d.createObjectStore(c, { keyPath: 'id' });
+        d.createObjectStore('meta');
+        d.createObjectStore('pendientes');
+      },
+    });
+    const tarjeta = nuevaTarjeta('de la v2', 'r', T0);
+    await db.put('tarjetas', tarjeta);
+    await db.put('meta', 2, 'esquema');
+    await db.put('meta', 9, 'cursor');
+    db.close();
+
+    const a = await abrir(nombre);
+    expect(await a.leer('curiosidades')).toEqual([]);
+    expect(await a.leer('tarjetas')).toEqual([tarjeta]);
+    expect(await a.meta('esquema')).toBe(ESQUEMA_VERSION);
+    // El servidor no enviaba curiosidades a la v2: se vuelve a pedir todo.
+    expect(await a.meta('cursor')).toBe(0);
+  });
+
   it('se niega a abrir datos de un esquema más nuevo', async () => {
     const nombre = 'bg-futuro';
     const a = await abrir(nombre);

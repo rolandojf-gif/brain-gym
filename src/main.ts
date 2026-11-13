@@ -3,6 +3,7 @@ import './styles/base.css';
 import { App, type Vista } from './app';
 import { Almacen } from './datos/almacen';
 import { esc } from './lib/html';
+import { curiosidades } from './vistas/curiosidades';
 import { datos } from './vistas/datos';
 import { estudio } from './vistas/estudio';
 import { hoy } from './vistas/hoy';
@@ -21,6 +22,8 @@ const VISTAS: Record<string, Vista> = {
   repaso,
   progreso,
   datos,
+  // En el menú «Más» y en la tarjeta de Hoy.
+  curiosidades,
   // Sin pestaña: se entra desde Hoy.
   secuencias,
 };

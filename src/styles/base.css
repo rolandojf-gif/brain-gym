@@ -249,7 +249,8 @@ table.plan thead th { font: 700 11px var(--f-mono); text-transform: uppercase; b
 .act .acciones { margin-top: auto; padding-top: 14px; }
 .act .act-obra { font: 700 21px/1.2 var(--f-head); }
 .act-lectura { --marca: var(--lime); }
-.act-idea { --marca: var(--ink); }
+.act-idea, .act-curiosidad { --marca: var(--ink); }
+.act-curiosidad .form-bloque { margin-top: 12px; }
 .act-reto { grid-column: span 7; padding: 22px; }
 .act-reto p { font-size: 16.5px; line-height: 1.6; }
 .act-reto .reto-hoy-titulo { font: 700 28px/1.12 var(--f-head); letter-spacing: -.015em; }
@@ -415,6 +416,16 @@ table.cap td { padding: 6px 8px; }
 .abogado-diablo textarea:focus { outline: 2px solid var(--lime); outline-offset: 1px; }
 .ad-tarjeta { border: 2px dashed #4A4A44; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
 .ad-tarjeta + .ad-tarjeta { margin-top: 10px; }
+
+/* ── Curiosidades: mismos paneles que la lectura; la exploración usa el panel oscuro del Abogado del Diablo. ── */
+.curiosidades .panel, .curiosidades .lista { max-width: 760px; }
+.curiosidad-paso, .curiosidades .escrito { margin-top: 20px; }
+/* La pregunta es una frase larga: en caja alta y a tamaño de título se leería mal. */
+.curiosidad-pregunta { text-transform: none; font-size: clamp(26px, 4vw, 38px); line-height: 1.15; max-width: 760px; }
+.curiosidades .acciones .tag { align-self: center; }
+.curiosidades .form-bloque textarea { font: 400 17px/1.6 var(--f-body); }
+.exploracion .fuentes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.exploracion .fuentes a { color: var(--lime); font: 400 15px/1.5 var(--f-body); }
 
 /* ── Calibración ──────────────────────────────────────────────────────── */
 .graf-cal { margin-top: 18px; max-width: 520px; }

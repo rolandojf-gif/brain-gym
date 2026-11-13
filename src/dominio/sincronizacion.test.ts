@@ -101,10 +101,24 @@ describe('servidor de sincronización', () => {
     expect(v2).toEqual(['retos', 'tarjetas']);
   });
 
-  it('colecciones por esquema: v1 sin retos; actual o futura, todas', () => {
+  it('una app v2 no recibe curiosidades; una v3 sí', () => {
+    const conCuriosidad = aplicarCambios(estadoVacio(), {
+      desde: 0,
+      esquema: 3,
+      cambios: [{ coleccion: 'curiosidades', registro: r('c1', 'pregunta') }, { coleccion: 'retos', registro: r('g1', 'reto') }],
+    }).estado;
+    const v2 = aplicarCambios(conCuriosidad, { desde: 0, cambios: [], esquema: 2 }).respuesta.cambios.map((c) => c.coleccion);
+    expect(v2).toEqual(['retos']);
+    const v3 = aplicarCambios(conCuriosidad, { desde: 0, cambios: [], esquema: 3 }).respuesta.cambios.map((c) => c.coleccion).sort();
+    expect(v3).toEqual(['curiosidades', 'retos']);
+  });
+
+  it('colecciones por esquema: v1 sin retos ni curiosidades; v2 sin curiosidades; actual o futura, todas', () => {
     expect(coleccionesDeEsquema(1)).not.toContain('retos');
-    expect(coleccionesDeEsquema(1)).toHaveLength(COLECCIONES.length - 1);
-    expect(coleccionesDeEsquema(2)).toEqual(COLECCIONES);
+    expect(coleccionesDeEsquema(1)).toHaveLength(COLECCIONES.length - 2);
+    expect(coleccionesDeEsquema(2)).not.toContain('curiosidades');
+    expect(coleccionesDeEsquema(2)).toContain('retos');
+    expect(coleccionesDeEsquema(3)).toEqual(COLECCIONES);
     expect(coleccionesDeEsquema(99)).toEqual(COLECCIONES);
   });
 });

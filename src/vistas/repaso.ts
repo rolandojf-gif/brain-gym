@@ -91,6 +91,10 @@ function borradorDesde(ctx: Ctx, coleccion: string, id: string): Partial<Tarjeta
     const l = e && ctx.datos.lecturas.find((x) => x.id === e.lecturaId);
     if (e) return { anverso: l ? `«${l.titulo}»: argumento central` : '', reverso: e.resumen, origen: { coleccion: 'escritos', id } };
   }
+  if (coleccion === 'curiosidades') {
+    const c = ctx.datos.curiosidades.find((x) => x.id === id);
+    if (c) return { anverso: c.pregunta, reverso: c.conclusion, origen: { coleccion: 'curiosidades', id } };
+  }
   if (coleccion === 'aprendizajes') {
     const a = ctx.datos.aprendizajes.find((x) => x.id === id);
     if (a) return { anverso: '', reverso: a.texto, origen: { coleccion: 'aprendizajes', id } };

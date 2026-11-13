@@ -11,7 +11,7 @@ Temas que entran con los retos generados por IA (Fase 2): la carrera por la AGI 
 </contexto>
 
 <objetivo>
-Al abrir la web veo un menú de tres cosas: un reto, una lectura y una idea (más adelante, una curiosidad mía). Elijo una, la hago y cierro. Si tengo tarjetas vencidas, una línea discreta me lo dice. Progreso me enseña lo que he aprendido y si acierto tanto como creo.
+Al abrir la web veo un menú de tres cosas: un reto, una lectura y una curiosidad mía. Elijo una, la hago y cierro. Si tengo tarjetas vencidas, una línea discreta me lo dice. Progreso me enseña lo que he aprendido y si acierto tanto como creo.
 </objetivo>
 
 <principios>
@@ -25,12 +25,13 @@ Al abrir la web veo un menú de tres cosas: un reto, una lectura y una idea (má
 </principios>
 
 <modulos>
-1. `01 Hoy` (`#hoy`). Menú de tres tarjetas: un reto (el tema rota; un selector permite cambiarlo), una lectura de la cola y una idea de una línea convertible en tarjeta de repaso. Si hay tarjetas vencidas, una línea discreta con cuántas son.
+1. `01 Hoy` (`#hoy`). Menú de tres tarjetas: un reto (el tema rota; un selector permite cambiarlo), una lectura de la cola y una curiosidad propia (retomar la abierta o apuntar una nueva). Si hay tarjetas vencidas, una línea discreta con cuántas son.
 2. `02 Retos` (`#estudio`). Ring de sparring con cinco temas: el catálogo integrado de 32 retos en los cuatro primeros y retos generados por IA, con su fuente y un botón «esto está mal», en todos (la carrera por la AGI, sólo generados). En cada tema se alternan catálogo y generados. Cada reto: (1) qué harías, opcional y antes de ver las opciones; jugada y confianza (30/60/90 %); (2) pista opcional; (3) resolución, modelo mental y guardado en un clic. El estado (`sin_ayuda`, `con_pista`, `solucion`) lo deduce la app. Los problemas abiertos (Newcomb) son retos de debate y no cuentan en las estadísticas.
 3. `03 Lectura` (`#lectura`). Cola de lecturas y «Extracción Quirúrgica 3x1» sin mirar el artículo: tesis central, mecanismo/incentivo y punto ciego/objeción, con el Abogado del Diablo de IA opcional.
-4. `04 Repaso` (`#repaso`). Tarjetas propias con FSRS (`ts-fsrs`), creadas en un clic desde retos fallados, síntesis 3x1 o ideas.
-5. `05 Progreso` (`#progreso`). Retos jugados por tema, tarjetas aprendidas y retención real, lecturas e ideas, y calibración en retos (Brier y sesgo de confianza).
-6. `06 Datos` (`#datos`). Sincronización entre dispositivos (`/api/sync` con Netlify Blobs), exportación/importación JSON completa y hora de corte del día.
+4. `04 Repaso` (`#repaso`). Tarjetas propias con FSRS (`ts-fsrs`), creadas en un clic desde retos fallados, síntesis 3x1 o curiosidades.
+5. `05 Progreso` (`#progreso`). Retos jugados por tema, tarjetas aprendidas y retención real, lo que te llevas (síntesis 3x1, curiosidades respondidas e ideas) y calibración en retos (Brier y sesgo de confianza).
+6. Curiosidades (`#curiosidades`, desde Hoy y el menú «Más»). Preguntas propias: hipótesis antes de mirar nada, exploración con IA que contrasta la hipótesis con fuentes comprobadas, «lo que me llevo» y tarjeta.
+7. `06 Datos` (`#datos`). Sincronización entre dispositivos (`/api/sync` con Netlify Blobs), exportación/importación JSON completa y hora de corte del día.
 </modulos>
 
 <fases>
@@ -39,5 +40,5 @@ Plan del 31 oct 2026 (detalle y decisiones en `docs/decisiones.md`, D6):
 - Fase 1: Hoy como menú, fuera plan semanal, sprint y calendario; Progreso simplificado.
 - Fase 2: retos generados por IA con fuente verificada, revisor y botón «esto está mal» (modelo de datos v2).
 - Una semana de uso.
-- Fase 3: curiosidades (hipótesis → exploración con IA → lo que me llevo → tarjeta).
+- Fase 3: curiosidades (hipótesis → exploración con IA → lo que me llevo → tarjeta; modelo de datos v3).
 </fases>
