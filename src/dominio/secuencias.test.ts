@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONFIG, CONFIG_PRACTICA, aPrima, cerrar, esObjetivo, nuevaPartida, pulsar, siguienteDigito, type Partida } from './secuencias';
+import { CONFIG, CONFIG_PRACTICA, aPrima, cerrar, esObjetivo, nuevaPartida, pulsar, rastro, siguienteDigito, type Partida } from './secuencias';
 
 /** Azar que no inserta ninguna secuencia ni señuelo y saca el dígito pedido como relleno (2 + floor(x·8)). */
 function relleno(digito: number): () => number {
@@ -83,13 +83,13 @@ describe('pulsar', () => {
 
   it('la secuencia que pasa sin respuesta es una omisión; dentro de la ventana de 1,8 s aún vale', () => {
     const p = nuevaPartida(0);
-    mostrar(p, [2, 4, 6, 9, 9, 9]); // el 6 sale en 1200; en 3000 se cumplen justo 1800
+    mostrar(p, [2, 4, 6, 9, 9]); // el 6 sale en 1200; el último 9, en 2400
     expect(p.omisiones).toBe(0);
-    expect(pulsar(p, 1200 + CONFIG.ventana).tipo).toBe('acierto');
+    expect(pulsar(p, 1200 + CONFIG.ventana - 1).tipo).toBe('acierto');
     const q = nuevaPartida(0);
-    mostrar(q, [2, 4, 6, 9, 9, 9, 9]); // en 3600 ya pasó
+    mostrar(q, [2, 4, 6, 9, 9, 9]); // en 3000 se cumplen los 1800: el aviso sale con el tercer dígito posterior
     expect(q.omisiones).toBe(1);
-    expect(q.omitidas).toEqual([[2, 4, 6]]);
+    expect(q.omitidas).toEqual([{ digitos: [2, 4, 6], fin: 2 }]);
   });
 
   it('recuerda cuál se escapó cuando sólo se caza una de dos encadenadas', () => {
@@ -97,7 +97,15 @@ describe('pulsar', () => {
     mostrar(p, [2, 4, 6, 8]);
     pulsar(p, 1500); // responde a 2-4-6
     mostrar(p, [9, 9, 9, 9], 2400);
-    expect(p.omitidas).toEqual([[4, 6, 8]]);
+    expect(p.omitidas).toEqual([{ digitos: [4, 6, 8], fin: 3 }]);
+  });
+
+  it('el rastro enseña la secuencia escapada entre los dígitos de antes y de después', () => {
+    const p = nuevaPartida(0);
+    mostrar(p, [9, 8, 7, 3, 5, 7, 2, 9, 4]);
+    const o = p.omitidas[0];
+    if (!o) throw new Error('debía haber una omisión');
+    expect(rastro(p, o).map((x) => (x.deLaSecuencia ? `[${x.digito}]` : String(x.digito))).join(' ')).toBe('8 7 [3] [5] [7] 2 9 4');
   });
 
   it('2-4-6-8 son dos secuencias', () => {

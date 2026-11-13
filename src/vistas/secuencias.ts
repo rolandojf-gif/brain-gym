@@ -2,7 +2,7 @@
    menú para cuando apetece, no un ejercicio que registrar. El estado vive en el módulo para que un repintado de
    fondo (una sincronización) no corte la partida; el bucle escribe en el DOM buscando los elementos cada vez. */
 import { accion, type Ctx, type Vista } from '../app';
-import { CONFIG, CONFIG_PRACTICA, OBJETIVOS, cerrar, nuevaPartida, pulsar, siguienteDigito, type Config, type Partida, type Resumen } from '../dominio/secuencias';
+import { CONFIG, CONFIG_PRACTICA, OBJETIVOS, cerrar, nuevaPartida, pulsar, rastro, siguienteDigito, type Config, type Omitida, type Partida, type Resumen } from '../dominio/secuencias';
 import { fmtNum, fmtPct } from '../lib/fmt';
 import { esc } from '../lib/html';
 
@@ -71,6 +71,7 @@ function renderJuego(p: Partida): string {
       <div class="sec-barra"><span data-sec-tiempo></span></div>
       <output class="sec-digito" data-sec-digito aria-live="off">${d ?? ''}</output>
       <p class="sec-senal" data-sec-senal role="status"></p>
+      <p class="sec-rastro" data-sec-rastro aria-hidden="true"></p>
       ${practica ? '<p class="sec-ritmo m-sub">Práctica: al principio, las secuencias salen marcadas</p>' : ''}
     </div>
     <button type="button" class="sec-boton" data-accion="sec-pulsar" tabindex="-1">Secuencia<small>o barra espaciadora</small></button>
@@ -101,21 +102,33 @@ const TEXTO_SENAL: Record<Senal, string> = { acierto: '✓ Cazada', 'falso-posit
 let relojSenal: ReturnType<typeof setTimeout> | undefined;
 
 /** La señal de cada respuesta: un texto bajo el dígito y el marco de la escena, lima si acierta y naranja si no. */
-function senalar(tipo: Senal, fallada?: readonly number[]): void {
+function senalar(tipo: Senal, fallada?: Omitida): void {
   destello(tipo === 'acierto' ? 'sec-bien' : 'sec-mal');
   const el = $<HTMLElement>('[data-sec-senal]');
+  const pista = $<HTMLElement>('[data-sec-rastro]');
   if (!el) return;
-  el.textContent = fallada ? `Se te pasó ${fallada.join(' · ')}` : TEXTO_SENAL[tipo];
+  el.textContent = fallada ? `Se te pasó ${fallada.digitos.join(' · ')}` : TEXTO_SENAL[tipo];
+  el.className = `sec-senal visible ${tipo === 'acierto' ? 'bien' : 'mal'}`;
+  if (pista) {
+    // El aviso llega cuando ya han pasado tres dígitos más: se enseña dónde estaba la secuencia, para que se vea
+    // que sí salió.
+    pista.innerHTML = fallada && partida
+      ? rastro(partida, fallada).map((x) => (x.deLaSecuencia ? `<b>${x.digito}</b>` : `<span>${x.digito}</span>`)).join('')
+      : '';
+    pista.classList.toggle('visible', Boolean(fallada));
+  }
   // También se enciende arriba, en la lista de objetivos, para verla donde ya se miran.
-  const chip = fallada ? $<HTMLElement>(`[data-sec-objetivo="${fallada.join('')}"]`) : null;
+  const chip = fallada ? $<HTMLElement>(`[data-sec-objetivo="${fallada.digitos.join('')}"]`) : null;
   if (chip) {
     chip.classList.remove('fallada');
     void chip.offsetWidth;
     chip.classList.add('fallada');
   }
-  el.className = `sec-senal visible ${tipo === 'acierto' ? 'bien' : 'mal'}`;
   clearTimeout(relojSenal);
-  relojSenal = setTimeout(() => el.classList.remove('visible'), 900);
+  relojSenal = setTimeout(() => {
+    el.classList.remove('visible');
+    pista?.classList.remove('visible');
+  }, fallada ? 1700 : 900);
 }
 
 /** Destello breve en la escena: lima si acierta, naranja si no. */
@@ -131,8 +144,8 @@ function mostrarDigito(d: number, p: Partida, t: number): void {
   const el = $<HTMLElement>('[data-sec-digito]');
   if (el) {
     el.textContent = String(d);
-    // Un parpadeo mínimo para que dos dígitos iguales seguidos se distingan.
-    el.animate?.([{ opacity: 0.1 }, { opacity: 1 }], { duration: 80 });
+    // Un apagón breve entre dígitos, para que dos iguales seguidos se vean como dos.
+    el.animate?.([{ opacity: 0 }, { opacity: 0, offset: 0.99 }, { opacity: 1 }], { duration: 90 });
     el.classList.toggle('pista', p.pista);
   }
   const barra = $<HTMLElement>('[data-sec-tiempo]');
