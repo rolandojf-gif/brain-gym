@@ -47,6 +47,8 @@ interface Objetivo {
   /** Momento en que apareció su último dígito. */
   t: number;
   respondido: boolean;
+  /** Sus tres dígitos, para poder decir cuál se escapó. */
+  digitos: readonly number[];
 }
 
 export interface Partida {
@@ -62,6 +64,8 @@ export interface Partida {
   abiertos: Objetivo[];
   aciertos: number;
   omisiones: number;
+  /** Las secuencias que se han escapado, en orden; la vista enseña la última si el usuario lo pide. */
+  omitidas: (readonly number[])[];
   falsosPositivos: number;
   /** Tiempos de reacción de los aciertos, en ms. */
   reacciones: number[];
@@ -93,6 +97,7 @@ export function nuevaPartida(inicio: number, config: Config = CONFIG): Partida {
     abiertos: [],
     aciertos: 0,
     omisiones: 0,
+    omitidas: [],
     falsosPositivos: 0,
     reacciones: [],
     terminada: false,
@@ -112,6 +117,7 @@ function caducar(p: Partida, t: number): void {
     if (o.respondido) continue;
     if (t - o.t > p.config.ventana) {
       p.omisiones++;
+      p.omitidas.push(o.digitos);
     } else {
       vivos.push(o);
     }
@@ -143,7 +149,7 @@ export function siguienteDigito(p: Partida, t: number, azar: () => number = Math
   p.pista = insertado && p.colaEsObjetivo && t - p.inicio < p.config.pistasHasta;
   p.digitos.push(d);
   // También cuentan las secuencias que salen solas al azar o encadenadas (2-4-6-8 son dos).
-  if (esObjetivo(p.digitos)) p.abiertos.push({ t, respondido: false });
+  if (esObjetivo(p.digitos)) p.abiertos.push({ t, respondido: false, digitos: p.digitos.slice(-3) });
   return d;
 }
 

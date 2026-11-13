@@ -13,6 +13,13 @@ let partida: Partida | null = null;
 let ultimo: Resumen | null = null;
 /** La partida en curso (o la última) era de práctica: su resultado no se enseña como medida. */
 let practica = false;
+
+/* Ayuda opcional: al escaparse una secuencia, enseñar cuál era. Preferencia de este dispositivo, no un dato. */
+const CLAVE_AYUDA = 'bg.secuencias.mostrarFallada';
+function leerAyuda(): boolean {
+  try { return localStorage.getItem(CLAVE_AYUDA) === 'si'; } catch { return false; }
+}
+let mostrarFallada = leerAyuda();
 let interrumpida = false;
 /** Cuándo acabó (o se cortó) la última partida: pasado un rato, al volver se ve otra vez la presentación. */
 let marca = 0;
@@ -27,7 +34,7 @@ const minutos = (ms: number) => ms / 60_000;
 
 function renderObjetivos(): string {
   return `<div class="sec-objetivos" aria-label="Secuencias objetivo">${OBJETIVOS.map(
-    (o) => `<span>${o.join('<i>·</i>')}</span>`,
+    (o) => `<span data-sec-objetivo="${o.join('')}">${o.join('<i>·</i>')}</span>`,
   ).join('')}</div>`;
 }
 
@@ -45,6 +52,10 @@ function renderInicio(): string {
       <p>Verás una señal cada vez: <b>✓</b> si la cazas, <b>✗</b> si pulsas sin secuencia y un aviso si se te pasa una.</p>
       <p class="m-sub">Mismos parámetros que la tarea RVP de Cambridge (Sahakian y otros, 1989). No se guarda nada.</p>
       ${aviso}
+      <label class="check-linea">
+        <input type="checkbox" data-accion="sec-ayuda"${mostrarFallada ? ' checked' : ''}>
+        <span>Mostrar la secuencia fallada: si se te escapa una, te enseña cuál era</span>
+      </label>
       <div class="acciones">
         <button type="button" class="btn primario grande" data-accion="sec-empezar">Empezar</button>
         <button type="button" class="btn" data-accion="sec-practicar">Practicar antes (${minutos(CONFIG_PRACTICA.duracion)} min, con pistas)</button>
@@ -90,11 +101,18 @@ const TEXTO_SENAL: Record<Senal, string> = { acierto: '✓ Cazada', 'falso-posit
 let relojSenal: ReturnType<typeof setTimeout> | undefined;
 
 /** La señal de cada respuesta: un texto bajo el dígito y el marco de la escena, lima si acierta y naranja si no. */
-function senalar(tipo: Senal): void {
+function senalar(tipo: Senal, fallada?: readonly number[]): void {
   destello(tipo === 'acierto' ? 'sec-bien' : 'sec-mal');
   const el = $<HTMLElement>('[data-sec-senal]');
   if (!el) return;
-  el.textContent = TEXTO_SENAL[tipo];
+  el.textContent = fallada ? `Se te pasó ${fallada.join(' · ')}` : TEXTO_SENAL[tipo];
+  // También se enciende arriba, en la lista de objetivos, para verla donde ya se miran.
+  const chip = fallada ? $<HTMLElement>(`[data-sec-objetivo="${fallada.join('')}"]`) : null;
+  if (chip) {
+    chip.classList.remove('fallada');
+    void chip.offsetWidth;
+    chip.classList.add('fallada');
+  }
   el.className = `sec-senal visible ${tipo === 'acierto' ? 'bien' : 'mal'}`;
   clearTimeout(relojSenal);
   relojSenal = setTimeout(() => el.classList.remove('visible'), 900);
@@ -130,7 +148,7 @@ function paso(): void {
   const omisiones = p.omisiones;
   mostrarDigito(siguienteDigito(p, t), p, t);
   // Al salir el dígito se cierran las ventanas vencidas: si alguna quedó sin respuesta, se avisa.
-  if (p.omisiones > omisiones) senalar('omision');
+  if (p.omisiones > omisiones) senalar('omision', mostrarFallada ? p.omitidas.at(-1) : undefined);
   reloj = setTimeout(paso, p.config.intervalo);
 }
 
@@ -205,6 +223,10 @@ export const secuencias: Vista = {
     ctxActual = ctx;
     accion(raiz, 'click', 'sec-empezar', () => empezar());
     accion(raiz, 'click', 'sec-practicar', () => empezar(CONFIG_PRACTICA));
+    accion(raiz, 'change', 'sec-ayuda', (el) => {
+      mostrarFallada = (el as HTMLInputElement).checked;
+      try { localStorage.setItem(CLAVE_AYUDA, mostrarFallada ? 'si' : 'no'); } catch { /* vale sólo para esta visita */ }
+    });
     accion(raiz, 'click', 'sec-parar', () => interrumpir(false));
     // pointerdown y no click: responde al tocar, sin esperar a levantar el dedo, que en móvil suma 100 ms o más.
     accion(raiz, 'pointerdown', 'sec-pulsar', (_el, e) => {

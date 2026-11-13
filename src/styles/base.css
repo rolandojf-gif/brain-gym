@@ -476,6 +476,9 @@ table.cap td { padding: 6px 8px; }
   font: 700 clamp(18px, 4vw, 26px)/1 var(--f-mono); font-variant-numeric: tabular-nums;
 }
 .sec-objetivos i { font-style: normal; color: var(--orange-ink); }
+.sec-objetivos span.fallada { animation: sec-fallada 1.2s ease-out; }
+@keyframes sec-fallada { 0%, 60% { background: var(--orange); color: #121211; } }
+.sec-reglas .check-linea { margin-bottom: 12px; }
 .sec-reglas p { margin: 0 0 10px; }
 /* La escena va siempre sobre asfalto, como la rejilla: el dígito destaca igual en los dos temas. */
 .sec-escena {

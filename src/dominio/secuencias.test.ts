@@ -89,6 +89,15 @@ describe('pulsar', () => {
     const q = nuevaPartida(0);
     mostrar(q, [2, 4, 6, 9, 9, 9, 9]); // en 3600 ya pasó
     expect(q.omisiones).toBe(1);
+    expect(q.omitidas).toEqual([[2, 4, 6]]);
+  });
+
+  it('recuerda cuál se escapó cuando sólo se caza una de dos encadenadas', () => {
+    const p = nuevaPartida(0);
+    mostrar(p, [2, 4, 6, 8]);
+    pulsar(p, 1500); // responde a 2-4-6
+    mostrar(p, [9, 9, 9, 9], 2400);
+    expect(p.omitidas).toEqual([[4, 6, 8]]);
   });
 
   it('2-4-6-8 son dos secuencias', () => {
