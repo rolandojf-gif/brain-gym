@@ -14,11 +14,12 @@ Web personal de un solo usuario para aprender por curiosidad sobre **Teoría de 
 
 ## Navegación (4 pestañas y un menú «Más»)
 
-- `Hoy` (`#hoy`): menú de tres tarjetas (un reto destacado con tema rotativo, selector y «¿Qué harías tú?», una lectura, una idea convertible en tarjeta), la rejilla viva del dilema del prisionero espacial y un aviso discreto si hay tarjetas vencidas.
+- `Hoy` (`#hoy`): menú de tres tarjetas (un reto destacado con tema rotativo, selector y «¿Qué harías tú?», una lectura, una curiosidad para retomar o apuntar), la rejilla viva del dilema del prisionero espacial y un aviso discreto si hay tarjetas vencidas.
 - `Retos` (`#estudio`): Ring de sparring con acordeón de 3 pasos. Cinco temas: el catálogo integrado de 32 retos en los cuatro primeros y retos generados por IA en todos (la carrera por la AGI, sólo generados), alternando catálogo y generados. El estado lo deduce la app; los retos de debate y los generados marcados como erróneos no cuentan en las estadísticas.
 - `Lectura` (`#lectura`): Extracción Quirúrgica 3x1 (Tesis central, Mecanismo/Incentivo, Punto ciego/Objeción; máx. ~40 palabras por campo).
-- `Repaso` (`#repaso`): Mazo FSRS (`ts-fsrs`) alimentado desde los retos fallados, lecturas y aprendizajes diarios.
-- Menú «Más» de la cabecera: `Progreso` (`#progreso`): retos jugados por tema, tarjetas aprendidas y retención, lecturas e ideas, y calibración en retos (Brier, sesgo y margen de ruido). Sin calendario ni tasas de acierto.
+- `Repaso` (`#repaso`): Mazo FSRS (`ts-fsrs`) alimentado desde los retos fallados, lecturas y curiosidades.
+- Menú «Más» de la cabecera: `Curiosidades` (`#curiosidades`, también desde Hoy): preguntas propias en cuatro pasos (hipótesis antes de mirar nada, exploración con IA vía `/api/explorar` con fuentes comprobadas, «lo que me llevo», tarjeta).
+- Menú «Más»: `Progreso` (`#progreso`): retos jugados por tema, tarjetas aprendidas y retención, lo que te llevas (síntesis, curiosidades e ideas), y calibración en retos (Brier, sesgo y margen de ruido). Sin calendario ni tasas de acierto.
 - Menú «Más»: `Datos` (`#datos`): sincronización entre dispositivos, exportación/importación JSON y hora de corte del día.
 - Menú «Más»: `Secuencias` (`#secuencias`), juego de atención sostenida (inspirado en el RVP de Cambridge), también con un enlace discreto en Hoy. No guarda nada.
 - El menú «Más» lleva además el estado de la sincronización y el selector de tema. Si la sincronización falla, sale un aviso en la cabecera.
@@ -48,7 +49,7 @@ Variable de entorno en Netlify: `BG_TOKEN` (mínimo 32 caracteres; generar con `
 - Funciones de Netlify en `netlify/functions/*.mts`; sus tests en `netlify/*.test.ts`, **nunca** dentro de `netlify/functions` (Netlify publicaría cualquier archivo de esa carpeta como función). La lógica va en `src/dominio` para probarla sin Netlify.
 - Tests de IndexedDB con `fake-indexeddb`.
 - PWA: `public/manifest.webmanifest` y `public/sw.js` (escrito a mano, sin dependencias). Si cambia la lista de archivos base o la estrategia del service worker, subir `CACHE` (`bg-vN`). El service worker sólo se registra en producción.
-- Lógica de dominio con tests obligatorios: FSRS, catálogo de retos (incluida la rotación de temas), estudio, calibración, migraciones, fusión de sincronización.
+- Lógica de dominio con tests obligatorios: FSRS, catálogo de retos (incluida la rotación de temas), estudio, calibración, curiosidades (pasos y parseo de la exploración), migraciones, fusión de sincronización.
 - Nombres de dominio en español (`temaSiguiente`, `intentos`, `CATALOGO_RETOS`); el código de librerías externas, como venga.
 - Modelo de datos versionado: se conservan el almacén `predicciones`, la colección `sesiones` y `ajustes.planSemanal` por retrocompatibilidad con exportaciones y sincronizaciones existentes aunque ya no estén en la interfaz. Un campo opcional nuevo no sube el esquema; un cambio incompatible o una colección nueva, sí (ver `docs/arquitectura.md`).
 - Fechas en ISO 8601. El «día» de la rutina es el día lógico de `src/lib/dia.ts` (corte a las 04:00).

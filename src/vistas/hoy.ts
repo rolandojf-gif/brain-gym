@@ -1,14 +1,16 @@
-/* 01 · Hoy: un menú, no una agenda. Tres cosas para elegir (un reto, una lectura, una idea), una rejilla viva que
+/* 01 · Hoy: un menú, no una agenda. Tres cosas para elegir (un reto, una lectura, una curiosidad), una rejilla viva que
    enseña algo de teoría de juegos mientras decides y, si hay tarjetas vencidas, un aviso discreto para repasarlas.
    Nada se marca como pendiente ni hecho. El reto va primero y grande: es lo que más invita a participar. */
 import { accion, campos, type Ctx, type Vista } from '../app';
 import { BLOQUES_RETOS, CATALOGO_RETOS, retosJugables, siguienteRetoPendiente, temaSiguiente, todosLosRetos, type Reto } from '../dominio/catalogo-retos';
-import { nuevaTarjeta, vencidas } from '../dominio/fsrs';
-import { actualizar, nuevo } from '../dominio/registro';
+import { ordenarCuriosidades, pasoCuriosidad } from '../dominio/explorar';
+import { vencidas } from '../dominio/fsrs';
+import { actualizar } from '../dominio/registro';
 import { separarPregunta } from '../dominio/texto';
-import type { Aprendizaje, TemaReto } from '../dominio/tipos';
+import type { TemaReto } from '../dominio/tipos';
 import { fmtFechaLarga, plural } from '../lib/fmt';
 import { esc, urlSegura } from '../lib/html';
+import { ACCION_PASO, formApuntar, montarApuntar } from './curiosidades';
 import { empezarReto } from './estudio';
 import { montarRejilla, renderRejilla } from './rejilla';
 
@@ -101,24 +103,24 @@ function renderLectura(ctx: Ctx): string {
     </article>`;
 }
 
-function renderIdea(ctx: Ctx): string {
-  const deHoy = ctx.datos.aprendizajes.filter((x) => !x.borrado && x.dia === ctx.hoy).sort((a, b) => b.creado.localeCompare(a.creado));
-  const ultima = deHoy[0];
+/* La curiosidad abierta más reciente, para retomarla; si no hay, la invitación a apuntar una. */
+function renderCuriosidad(ctx: Ctx): string {
+  const todas = ordenarCuriosidades(ctx.datos.curiosidades);
+  const abierta = todas.find((c) => pasoCuriosidad(c) !== 'cerrada');
+  const verTodas = todas.length ? `<a class="btn sutil" href="#curiosidades">Todas (${todas.length})</a>` : '';
+  const cuerpo = abierta
+    ? `
+      <p class="act-obra">${esc(abierta.pregunta)}</p>
+      <p class="m-sub">${pasoCuriosidad(abierta) === 'hipotesis' ? 'Antes de mirar nada: ¿qué crees tú?' : pasoCuriosidad(abierta) === 'explorar' ? 'Tienes tu hipótesis. ¿La contrastamos?' : 'Explorada. ¿Qué te llevas?'}</p>
+      <div class="acciones">
+        <a class="btn primario" href="#curiosidades/${esc(abierta.id)}">${esc(ACCION_PASO[pasoCuriosidad(abierta)])}</a>
+        <a class="btn sutil" href="#curiosidades">Apuntar otra</a>
+      </div>`
+    : `${formApuntar('Una pregunta que te ronde')}${verTodas ? `<div class="acciones">${verTodas}</div>` : ''}`;
   return `
-    <article class="act act-idea">
-      <header><h2>Una idea</h2></header>
-      ${ultima ? `<p class="m-sub">Hoy apuntaste: «${esc(ultima.texto)}»${deHoy.length > 1 ? ` y ${plural(deHoy.length - 1, 'otra', 'otras')}` : ''}.</p>` : ''}
-      <form class="form-bloque" data-accion="aprendizaje">
-        <label class="campo">
-          Un modelo mental que te llevas, en una línea
-          <input name="texto" required placeholder="Ley de Goodhart: la métrica que se persigue deja de medir.">
-        </label>
-        <label class="check-linea">
-          <input type="checkbox" name="crearTarjeta" value="si" checked>
-          <span>Convertir también en tarjeta</span>
-        </label>
-        <div class="acciones"><button class="btn primario">Guardar</button></div>
-      </form>
+    <article class="act act-curiosidad">
+      <header><h2>Una curiosidad</h2></header>
+      ${cuerpo}
     </article>`;
 }
 
@@ -139,13 +141,14 @@ export const hoy: Vista = {
           ${renderReto(ctx)}
           <div class="hoy-lado">
             ${renderLectura(ctx)}
-            ${renderIdea(ctx)}
+            ${renderCuriosidad(ctx)}
           </div>
         </div>
       </section>`;
   },
   montar(ctx, raiz) {
     montarRejilla(raiz);
+    montarApuntar(ctx, raiz);
 
     accion(raiz, 'input', 'borrador-reto', (el) => {
       borrador = { retoId: el.dataset.id ?? '', texto: (el as HTMLTextAreaElement).value };
@@ -175,33 +178,6 @@ export const hoy: Vista = {
       const ahora = new Date();
       await ctx.guardar({ coleccion: 'lecturas', registro: actualizar(l, { estado: 'leida', leidaEl: ahora.toISOString() }, ahora) });
       ctx.ir(`#lectura/escribir/${l.id}`);
-    });
-
-    accion(raiz, 'submit', 'aprendizaje', async (form, e) => {
-      e.preventDefault();
-      const v = campos(form as HTMLFormElement);
-      const texto = (v.texto ?? '').trim();
-      if (!texto) return;
-      const ahora = new Date();
-      const baseAp: Aprendizaje = nuevo({ dia: ctx.hoy, texto }, ahora);
-
-      if (v.crearTarjeta === 'si') {
-        const tarjeta = nuevaTarjeta(
-          `¿Cuál es la regla o modelo mental clave sobre: «${texto.slice(0, 70)}${texto.length > 70 ? '…' : ''}»?`,
-          texto,
-          ahora,
-          { coleccion: 'aprendizajes', id: baseAp.id },
-        );
-        const conTarjeta: Aprendizaje = { ...baseAp, tarjetaId: tarjeta.id };
-        await ctx.guardar(
-          { coleccion: 'aprendizajes', registro: conTarjeta },
-          { coleccion: 'tarjetas', registro: tarjeta },
-        );
-      } else {
-        await ctx.guardar({ coleccion: 'aprendizajes', registro: baseAp });
-      }
-      await ctx.registrar('concepto');
-      ctx.avisar(v.crearTarjeta === 'si' ? 'Idea guardada y convertida en tarjeta de repaso.' : 'Idea guardada.');
     });
   },
 };

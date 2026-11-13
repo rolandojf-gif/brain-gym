@@ -17,6 +17,8 @@ export type Migracion = (d: DatosVersionados) => DatosVersionados;
 export const MIGRACIONES: Readonly<Record<number, Migracion>> = {
   // v1 → v2: nace la colección `retos` (retos generados por IA). Los registros existentes no cambian.
   1: (d) => ({ ...d, esquema: 2, datos: { ...d.datos, retos: d.datos.retos ?? [] } }),
+  // v2 → v3: nace la colección `curiosidades` (preguntas propias). Los registros existentes no cambian.
+  2: (d) => ({ ...d, esquema: 3, datos: { ...d.datos, curiosidades: d.datos.curiosidades ?? [] } }),
 };
 
 export class ErrorDeDatos extends Error {

@@ -9,8 +9,8 @@ import { fusionar, ganador, type Cambio } from '../dominio/sincronizacion';
 import { COLECCIONES, ESQUEMA_VERSION, coleccionesVacias, type Base, type Coleccion, type Colecciones, type Exportacion, type Lectura } from '../dominio/tipos';
 
 /* La versión de IndexedDB sólo cambia si cambia la lista de tiendas o índices; la forma de los datos la versiona
-   ESQUEMA_VERSION con migraciones puras. v2: tienda `retos`. */
-const VERSION_IDB = 2;
+   ESQUEMA_VERSION con migraciones puras. v2: tienda `retos`; v3: tienda `curiosidades`. */
+const VERSION_IDB = 3;
 const META = 'meta';
 const PENDIENTES = 'pendientes';
 

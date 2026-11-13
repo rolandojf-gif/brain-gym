@@ -1,8 +1,8 @@
-/* Modelo de datos v2 (ver docs/arquitectura.md). Un cambio incompatible (quitar o renombrar un campo, cambiar su
+/* Modelo de datos v3 (ver docs/arquitectura.md). Un cambio incompatible (quitar o renombrar un campo, cambiar su
    significado o añadir una colección) exige subir ESQUEMA_VERSION y añadir una migración en migraciones.ts. Un campo
    opcional nuevo no: los registros sin él siguen siendo válidos y una app anterior lo conserva al sincronizar. */
 
-export const ESQUEMA_VERSION = 2;
+export const ESQUEMA_VERSION = 3;
 
 /** Campos comunes: identidad estable entre dispositivos, fusión «gana el último» y borrado lógico. */
 export interface Base {
@@ -182,6 +182,28 @@ export interface RetoGenerado extends Base {
   reporte?: { nota: string; el: string };
 }
 
+/** Lo que devuelve /api/explorar: la IA responde a la hipótesis del usuario. Sólo fuentes que respondían al pedirlas. */
+export interface ExploracionIa {
+  acierta: string;
+  falla: string;
+  investigacion: string;
+  fuentes: { titulo: string; url: string }[];
+  modelo: string;
+  fecha: string;
+}
+
+/**
+ * Una pregunta propia (v3). Cuatro pasos: hipótesis (antes de mirar nada), exploración con IA, «lo que me llevo»
+ * con tus palabras y, si quieres, tarjeta. El paso en que está se deduce de los campos; no hay estado «pendiente».
+ */
+export interface Curiosidad extends Base {
+  pregunta: string;
+  hipotesis: string;
+  exploracion?: ExploracionIa;
+  conclusion: string;
+  tarjetaId?: string;
+}
+
 export interface Colecciones {
   ajustes: Ajustes[];
   fuentes: Fuente[];
@@ -194,19 +216,22 @@ export interface Colecciones {
   sesiones: Sesion[];
   aprendizajes: Aprendizaje[];
   retos: RetoGenerado[];
+  curiosidades: Curiosidad[];
 }
 
 export type Coleccion = keyof Colecciones;
 
 export const COLECCIONES: readonly Coleccion[] = [
   'ajustes', 'fuentes', 'intentos', 'lecturas', 'escritos', 'tarjetas', 'repasos', 'predicciones', 'sesiones', 'aprendizajes', 'retos',
+  'curiosidades',
 ];
 
 /** Colecciones que conoce cada versión del esquema. El servidor sólo envía a un dispositivo las de su versión: una app
     anterior que recibiera una colección sin tienda en IndexedDB fallaría al sincronizar. */
 const COLECCIONES_POR_ESQUEMA: Readonly<Record<number, readonly Coleccion[]>> = {
-  1: COLECCIONES.filter((c) => c !== 'retos'),
-  2: COLECCIONES,
+  1: COLECCIONES.filter((c) => c !== 'retos' && c !== 'curiosidades'),
+  2: COLECCIONES.filter((c) => c !== 'curiosidades'),
+  3: COLECCIONES,
 };
 
 export function coleccionesDeEsquema(esquema: number): readonly Coleccion[] {
@@ -225,6 +250,6 @@ export interface Exportacion {
 export function coleccionesVacias(): Colecciones {
   return {
     ajustes: [], fuentes: [], intentos: [], lecturas: [], escritos: [],
-    tarjetas: [], repasos: [], predicciones: [], sesiones: [], aprendizajes: [], retos: [],
+    tarjetas: [], repasos: [], predicciones: [], sesiones: [], aprendizajes: [], retos: [], curiosidades: [],
   };
 }

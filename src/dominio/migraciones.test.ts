@@ -31,10 +31,23 @@ describe('migrar', () => {
   it('v1 → v2: añade la colección de retos generados y no toca lo demás', () => {
     const intento = { id: 'i', creado: 'x', actualizado: 'x', borrado: false, ejercicio: '1.1', estado: 'sin_ayuda' };
     const v1 = { app: 'brain-gym', esquema: 1, exportadoEl: 'x', datos: { intentos: [intento], ajustes: [] } };
-    const r = migrar(v1);
+    const r = migrar(v1, undefined, 2);
     expect(r.esquema).toBe(2);
     expect(r.datos.retos).toEqual([]);
     expect(r.datos.intentos).toEqual([intento]);
+  });
+
+  it('v2 → v3: añade la colección de curiosidades y conserva los retos', () => {
+    const reto = { id: 'g1', creado: 'x', actualizado: 'x', borrado: false, tema: '5' };
+    const v2 = { app: 'brain-gym', esquema: 2, exportadoEl: 'x', datos: { retos: [reto] } };
+    const r = migrar(v2);
+    expect(r.esquema).toBe(3);
+    expect(r.datos.curiosidades).toEqual([]);
+    expect(r.datos.retos).toEqual([reto]);
+  });
+
+  it('una exportación v1 llega hasta la versión actual', () => {
+    expect(migrar({ app: 'brain-gym', esquema: 1, exportadoEl: '', datos: {} }).esquema).toBe(ESQUEMA_VERSION);
   });
 
   it('falla si falta un eslabón', () => {

@@ -24,7 +24,7 @@ Tres capas, en este orden de dependencia:
 2. **Datos** (`src/datos`): IndexedDB vía `idb`, exportar/importar, cola de cambios y cliente de sincronización.
 3. **Vistas** (`src/vistas`): una por pestaña. Pintan con plantillas y `esc()`, escuchan eventos y llaman al dominio y a los datos.
 
-## Modelo de datos v2
+## Modelo de datos v3
 
 Todas las colecciones comparten estos campos, que permiten sincronizar y migrar sin pérdidas:
 
@@ -48,14 +48,16 @@ Colecciones:
 | `repasos` | `tarjetaId`, `nota`, `repasadoEl`, `estadoPrevio` | Registro inmutable de cada repaso (el `ReviewLog` de FSRS). Nunca se edita. |
 | `predicciones` | `enunciado`, `probabilidad` (0–1), `venceEl`, `categoria`, `resolucion?: {resultado, resueltaEl}` | `resultado = 'si' \| 'no' \| 'anulada'`. Las anuladas no entran en el Brier. |
 | `sesiones` | `dia`, `actividad`, `inicio`, `fin?`, `segundos` | Una por actividad hecha, con el tiempo dedicado. Ya no la muestra ninguna vista (salió el calendario), pero se sigue guardando y exportando. |
-| `aprendizajes` | `dia`, `texto`, `fuenteUrl?`, `tarjetaId?` | «Qué aprendí hoy». |
+| `aprendizajes` | `dia`, `texto`, `fuenteUrl?`, `tarjetaId?` | «Qué aprendí hoy». Desde el 13 nov 2026 ya no se apuntan desde Hoy (las sustituyen las curiosidades); las guardadas siguen en Repaso y en Progreso. |
 | `retos` (v2) | `tema` (`'1'…'5'`), `titulo`, `escenario`, `opciones: {id, texto, porQue}[]`, `opcionCorrecta` (`null` en debates), `pista`, `solucion`, `modeloMental`, `fuente: {titulo, url}`, `modelo`, `revision`, `reporte?: {nota, el}` | Retos generados por IA. Se guardan enteros porque son contenido de la app, no externo. Sus intentos van a `intentos` igual que los del catálogo: `fuenteId = 'catalogo-retos'`, `capitulo = tema`, `ejercicio = id`. Si está «listo» (sin intentos) o jugado se deduce de los intentos, no se guarda. `reporte` es el «esto está mal»: el reto no se vuelve a ofrecer y sus intentos salen de las métricas. |
+
+| `curiosidades` (v3) | `pregunta`, `hipotesis`, `exploracion?: {acierta, falla, investigacion, fuentes: {titulo, url}[], modelo, fecha}`, `conclusion`, `tarjetaId?` | Preguntas propias. `hipotesis` y `conclusion` empiezan vacías. El paso (hipótesis, explorar, lo que me llevo, cerrada) se deduce de qué campos están escritos (`pasoCuriosidad`). La tarjeta lleva `origen: {coleccion: 'curiosidades', id}`, con la pregunta en el anverso y «lo que me llevo» en el reverso. |
 
 Lo que se calcula y no se guarda: Brier y calibración (de predicciones y de retos), progreso por capítulo y el tema que toca en la rotación de retos.
 
 ## Migraciones
 
-- `ESQUEMA_VERSION` es un entero que empieza en 1. Va por la 2: la v2 añade la colección `retos` (31 oct 2026).
+- `ESQUEMA_VERSION` es un entero que empieza en 1. Va por la 3: la v2 añade la colección `retos` (31 oct 2026); la v3, `curiosidades` (13 nov 2026).
 - Sube con cada cambio incompatible: quitar o renombrar un campo, cambiar su significado o añadir una colección. Un campo opcional nuevo no la sube: los registros sin él siguen siendo válidos y una app anterior lo conserva al sincronizar, porque guarda el registro entero.
 - Una migración es una función pura `(datos v_n) → datos v_n+1` sobre la misma forma que la exportación JSON. Cada una lleva test con datos de ejemplo de la versión anterior.
 - Se aplican en dos sitios con el mismo código: al abrir la base de datos (si la versión guardada es menor) y al importar un JSON antiguo. Así una exportación de hoy se podrá importar dentro de un año.
@@ -86,7 +88,7 @@ Objetivo: lo más simple que sea correcto para un usuario con dos dispositivos.
 
 ## Hoy
 
-Un menú, no una agenda: un reto (destacado, con «¿Qué harías tú?»), una lectura y una idea, más un aviso discreto si hay tarjetas vencidas y la rejilla viva del dilema del prisionero espacial (`src/dominio/rejilla.ts`, dibujada en un canvas por `src/vistas/rejilla.ts`; su estado vive en el módulo para que repintar Hoy no la reinicie, y se para sola al salir de Hoy, con la pestaña oculta o con «reducir movimiento»). Lo escrito en «¿Qué harías tú?» pasa al reto con `empezarReto` (`src/vistas/estudio.ts`), que lo abre con las opciones ya visibles. El tema del reto lo da `temaSiguiente(intentos, retos)` (`src/dominio/catalogo-retos.ts`): el tema siguiente al del último reto jugado, en orden circular, saltando los que no tienen retos por estrenar. El selector de Hoy lo cambia hasta que se juega otro reto. Un tema sin ningún reto (la carrera por la AGI antes del primer generado) no se ofrece.
+Un menú, no una agenda: un reto (destacado, con «¿Qué harías tú?»), una lectura y una curiosidad (la abierta más reciente para retomarla o, si no hay, un campo para apuntar una), más un aviso discreto si hay tarjetas vencidas y la rejilla viva del dilema del prisionero espacial (`src/dominio/rejilla.ts`, dibujada en un canvas por `src/vistas/rejilla.ts`; su estado vive en el módulo para que repintar Hoy no la reinicie, y se para sola al salir de Hoy, con la pestaña oculta o con «reducir movimiento»). Lo escrito en «¿Qué harías tú?» pasa al reto con `empezarReto` (`src/vistas/estudio.ts`), que lo abre con las opciones ya visibles. El tema del reto lo da `temaSiguiente(intentos, retos)` (`src/dominio/catalogo-retos.ts`): el tema siguiente al del último reto jugado, en orden circular, saltando los que no tienen retos por estrenar. El selector de Hoy lo cambia hasta que se juega otro reto. Un tema sin ningún reto (la carrera por la AGI antes del primer generado) no se ofrece.
 
 ## Retos: catálogo y generados
 
@@ -97,7 +99,7 @@ Un menú, no una agenda: un reto (destacado, con «¿Qué harías tú?»), una l
 
 ## Funciones de IA
 
-Las dos funciones comparten `netlify/servidor.ts` (token, variables de entorno, llamada a OpenRouter y cupo) y la misma `OPENROUTER_API_KEY`.
+Las tres funciones comparten `netlify/servidor.ts` (token, variables de entorno, llamada a OpenRouter, cupo y comprobación de fuentes) y la misma `OPENROUTER_API_KEY`.
 
 - **`/api/ia`:** el Abogado del Diablo de las lecturas. Una llamada por petición, con razonamiento acotado (`effort: 'low'`) y hasta 6000 tokens. Sólo vale el JSON con sus tres claves: una respuesta cortada (`finish_reason: length`) o sin ese formato es un error que la app enseña, nunca el razonamiento ni texto suelto. Una auditoría se puede repetir; las guardadas con el antiguo relleno de texto libre se marcan como rotas. La auditoría propone además dos tarjetas (`tarjetas`: la pieza que faltaba en el mecanismo y la vulnerabilidad real), que el usuario edita antes de guardarlas; al guardarlas, la propuesta lleva el `tarjetaId`. Con un campo `replica` en el cuerpo, `/api/ia` responde un solo asalto a la réplica del usuario (`{ veredicto: concede | matiza | mantiene, respuesta }`, límite de 6000 caracteres). Ambos son campos opcionales de `FeedbackIa`: no suben el esquema.
 - **`/api/retos`:** genera un reto sobre un tema (`{ tema, vistos }`). Un solo intento por petición, porque una función síncrona de Netlify tiene 60 s:
@@ -106,7 +108,8 @@ Las dos funciones comparten `netlify/servidor.ts` (token, variables de entorno, 
   3. **Comprobar la fuente:** una petición GET de 6 s. Vale si responde por debajo de 400 o con 401/403/429 (existe, pero bloquea a robots); sólo se mira el código, no el contenido.
   4. **Revisar** con `OPENROUTER_MODEL_REVISOR` (por defecto, el mismo modelo; uno de otra familia detecta mejor los errores), temperatura 0, con razonamiento (`effort: 'low'`) y hasta 6000 tokens, porque juzgar si sólo una opción es defendible sí lo pide. Si hay más de una opción defendible o la fuente no respalda la solución, se descarta.
   Un fallo en 2, 3 o 4 responde 422 con `motivo` (`formato`, `fuente`, `revisor`); la app vuelve a pedir más tarde, en segundo plano.
-- **Cupo diario:** 40 llamadas a OpenRouter por día UTC entre las dos funciones (`MAX_LLAMADAS_IA_DIA`), en el blob `cupo-ia` con la misma escritura condicional que la sincronización. `/api/retos` sólo puede llenar hasta 30 (`MAX_LLAMADAS_RETOS_DIA`): las otras 10 (`RESERVA_ABOGADO`) quedan siempre para el Abogado del Diablo, porque los retos se piden solos y un fallo en bucle no debe dejar sin él. Un reto gasta una llamada si se descarta antes del revisor y dos si llega a él. `llamarConCupo` reserva antes de llamar y devuelve la llamada si OpenRouter la rechaza sin generar nada (HTTP de error o sin red: modelo inexistente, clave mala), porque no cuesta; una respuesta generada pero inválida sí cuenta. Agotado, responde 429. Es un freno ante un bucle o un token filtrado; el límite de gasto real es el de la clave en OpenRouter.
+- **`/api/explorar`:** contrasta la hipótesis de una curiosidad (`{ pregunta, hipotesis }`, ambas obligatorias). Una llamada con razonamiento acotado (`effort: 'low'`) y hasta 6000 tokens; devuelve `{ acierta, falla, investigacion, fuentes, descartadas, modelo }`. Sólo vale el JSON con las tres piezas de texto: cortada o sin formato es un error (502), nunca el borrador del modelo. Las fuentes (hasta 3) se comprueban en paralelo con la misma regla que las de los retos y sólo se devuelven las que responden.
+- **Cupo diario:** 40 llamadas a OpenRouter por día UTC entre las tres funciones (`MAX_LLAMADAS_IA_DIA`), en el blob `cupo-ia` con la misma escritura condicional que la sincronización. `/api/retos` sólo puede llenar hasta 30 (`MAX_LLAMADAS_RETOS_DIA`): las otras 10 (`RESERVA_ABOGADO`) quedan siempre para el Abogado del Diablo y las curiosidades, porque los retos se piden solos y un fallo en bucle no debe dejar sin él. Un reto gasta una llamada si se descarta antes del revisor y dos si llega a él. `llamarConCupo` reserva antes de llamar y devuelve la llamada si OpenRouter la rechaza sin generar nada (HTTP de error o sin red: modelo inexistente, clave mala), porque no cuesta; una respuesta generada pero inválida sí cuenta. Agotado, responde 429. Es un freno ante un bucle o un token filtrado; el límite de gasto real es el de la clave en OpenRouter.
 
 ## Móvil
 

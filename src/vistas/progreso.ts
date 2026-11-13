@@ -1,8 +1,9 @@
-/* 05 · Progreso: lo aprendido (retos jugados por tema, tarjetas y retención real, lecturas e ideas) y la calibración.
+/* 05 · Progreso: lo aprendido (retos jugados por tema, tarjetas y retención real, lecturas, curiosidades e ideas) y la calibración.
    Sin calendario ni tasas de acierto: el detalle por reto está en Retos. */
 import type { Vista } from '../app';
 import { calibracionRetos, type CalibracionRetos } from '../dominio/calibracion';
 import { BLOQUES_RETOS, CATALOGO_RETOS, ID_FUENTE_RETOS, todosLosRetos } from '../dominio/catalogo-retos';
+import { pasoCuriosidad } from '../dominio/explorar';
 import { madurezMazo } from '../dominio/progreso';
 import { fmtNum, fmtPct, plural } from '../lib/fmt';
 import { esc } from '../lib/html';
@@ -62,6 +63,13 @@ export const progreso: Vista = {
     const mazo = madurezMazo(ctx.datos.tarjetas, ctx.datos.repasos);
     const escritos = ctx.datos.escritos.filter((e) => !e.borrado).length;
     const ideas = ctx.datos.aprendizajes.filter((a) => !a.borrado).length;
+    const respondidas = ctx.datos.curiosidades.filter((c) => !c.borrado && pasoCuriosidad(c) === 'cerrada').length;
+    // Las ideas sueltas ya no se apuntan desde Hoy; sólo se enseñan si había alguna.
+    const detalle = [
+      plural(escritos, 'síntesis 3x1', 'síntesis 3x1'),
+      plural(respondidas, 'curiosidad respondida', 'curiosidades respondidas'),
+      ...(ideas ? [plural(ideas, 'idea apuntada', 'ideas apuntadas')] : []),
+    ].join(' · ');
 
     return `
       <section class="view">
@@ -79,9 +87,9 @@ export const progreso: Vista = {
             <span class="s">Retención: ${fmtPct(mazo.retencion)} en ${plural(mazo.totalRepasos, 'repaso')}</span>
           </div>
           <div class="kpi">
-            <span class="k">Lecturas e ideas</span>
-            <span class="v">${escritos + ideas}</span>
-            <span class="s">${plural(escritos, 'síntesis 3x1', 'síntesis 3x1')} · ${plural(ideas, 'idea apuntada', 'ideas apuntadas')}</span>
+            <span class="k">Lo que te llevas</span>
+            <span class="v">${escritos + respondidas + ideas}</span>
+            <span class="s">${detalle}</span>
           </div>
         </div>
 

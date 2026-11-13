@@ -143,3 +143,25 @@ export async function llamarConCupo(payload: Record<string, unknown>, limite = L
     throw e;
   }
 }
+
+const TIEMPO_FUENTE_MS = 6000;
+
+/**
+ * ¿La URL existe? Basta con que responda: 2xx/3xx, o 401/403/429 (existe pero bloquea a robots, como muchas revistas).
+ * Un 404, un 410, un 5xx o un dominio que no resuelve la descartan. No se lee el cuerpo: sólo importa el código.
+ */
+export async function comprobarFuente(url: string): Promise<{ ok: boolean; detalle: string }> {
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: AbortSignal.timeout(TIEMPO_FUENTE_MS),
+      headers: { 'User-Agent': 'BrainGym/1.0 (verificacion de fuentes)', Accept: 'text/html,application/xhtml+xml,*/*' },
+    });
+    await res.body?.cancel().catch(() => undefined);
+    const ok = res.status < 400 || [401, 403, 429].includes(res.status);
+    return { ok, detalle: `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, detalle: e instanceof Error ? e.name : 'error de red' };
+  }
+}
