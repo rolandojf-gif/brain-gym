@@ -117,4 +117,4 @@ Rolando notó que el juego no seguía el estándar y que no avisaba al acertar n
 - **Medidas:** A′ de Grier (sensibilidad), secuencias cazadas, falsas alarmas con su tasa y latencia media de los aciertos.
 - **Señal en cada respuesta:** «✓ Cazada» en lima, «✗ No había secuencia» y «Se te pasó una» en naranja, con el marco de la escena del mismo color. El aviso de la omisión llega al cerrarse su ventana.
 - Los parámetros se tomaron del protocolo RVP de CANTAB de memoria, sin contrastarlos con el manual; la ventana de 1,8 s es el menos seguro.
-
+- **Mostrar la secuencia fallada (opcional, 13 nov 2026):** una casilla en la presentación; activada, al escaparse una secuencia la señal dice cuál («Se te pasó 2 · 4 · 6») y se enciende en naranja en la lista de objetivos. La preferencia se guarda en el dispositivo (`localStorage`), no en los datos. No es parte del RVP: es una ayuda para aprender.
