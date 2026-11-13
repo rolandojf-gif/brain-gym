@@ -49,6 +49,14 @@ interface Objetivo {
   respondido: boolean;
   /** Sus tres dígitos, para poder decir cuál se escapó. */
   digitos: readonly number[];
+  /** Posición de su último dígito en `Partida.digitos`, para poder enseñar dónde estaba. */
+  fin: number;
+}
+
+/** Una secuencia que se escapó: cuál era y dónde acababa. */
+export interface Omitida {
+  digitos: readonly number[];
+  fin: number;
 }
 
 export interface Partida {
@@ -65,7 +73,7 @@ export interface Partida {
   aciertos: number;
   omisiones: number;
   /** Las secuencias que se han escapado, en orden; la vista enseña la última si el usuario lo pide. */
-  omitidas: (readonly number[])[];
+  omitidas: Omitida[];
   falsosPositivos: number;
   /** Tiempos de reacción de los aciertos, en ms. */
   reacciones: number[];
@@ -115,9 +123,10 @@ function caducar(p: Partida, t: number): void {
   const vivos: Objetivo[] = [];
   for (const o of p.abiertos) {
     if (o.respondido) continue;
-    if (t - o.t > p.config.ventana) {
+    // Justo al cumplirse: así el aviso sale con el tercer dígito posterior (1,8 s) y no con el cuarto.
+    if (t - o.t >= p.config.ventana) {
       p.omisiones++;
-      p.omitidas.push(o.digitos);
+      p.omitidas.push({ digitos: o.digitos, fin: o.fin });
     } else {
       vivos.push(o);
     }
@@ -149,7 +158,7 @@ export function siguienteDigito(p: Partida, t: number, azar: () => number = Math
   p.pista = insertado && p.colaEsObjetivo && t - p.inicio < p.config.pistasHasta;
   p.digitos.push(d);
   // También cuentan las secuencias que salen solas al azar o encadenadas (2-4-6-8 son dos).
-  if (esObjetivo(p.digitos)) p.abiertos.push({ t, respondido: false, digitos: p.digitos.slice(-3) });
+  if (esObjetivo(p.digitos)) p.abiertos.push({ t, respondido: false, digitos: p.digitos.slice(-3), fin: p.digitos.length - 1 });
   return d;
 }
 
@@ -203,4 +212,13 @@ export function aPrima(h: number, f: number): number {
   if (h === f) return 0.5;
   if (h > f) return 0.5 + ((h - f) * (1 + h - f)) / (4 * h * (1 - f));
   return 0.5 - ((f - h) * (1 + f - h)) / (4 * f * (1 - h));
+}
+
+/**
+ * Los dígitos de alrededor de una secuencia que se escapó, para enseñar que sí salió: dos de antes, los tres de la
+ * secuencia (marcados) y los que han pasado después.
+ */
+export function rastro(p: Pick<Partida, 'digitos'>, o: Omitida): { digito: number; deLaSecuencia: boolean }[] {
+  const desde = Math.max(0, o.fin - 4);
+  return p.digitos.slice(desde).map((digito, i) => ({ digito, deLaSecuencia: desde + i >= o.fin - 2 && desde + i <= o.fin }));
 }
