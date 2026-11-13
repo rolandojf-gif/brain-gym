@@ -106,3 +106,15 @@ A la web le faltaba «una pizca de encanto». De tres propuestas (momentos con c
 - **Sin datos nuevos:** sale de lo que ya se guarda (`src/dominio/recuerdos.ts`); no hay colección ni cambio de esquema. No es una métrica ni un deber (principios 1 y 2).
 - Quedan como posibles peldaños siguientes las otras dos propuestas.
 
+## D12. Secuencias según el estándar RVP · decidida (13 nov 2026)
+
+Rolando notó que el juego no seguía el estándar y que no avisaba al acertar ni al dejar pasar una secuencia. Sustituye a los parámetros de D8:
+
+- **Ritmo fijo:** 600 ms por dígito toda la partida. El ritmo adaptativo de D8 hacía que dos partidas no fueran comparables.
+- **Ventana de respuesta:** 1,8 s (antes 1,5 s).
+- **Duración:** 4 minutos, con una práctica opcional de 1 minuto: la primera mitad con los dígitos de cada secuencia marcados y la segunda sin ayuda. La práctica no se enseña como medida.
+- **Señuelos:** además de las secuencias (unas 8 por cada 100 dígitos), se insertan arranques que no se cierran (2-4-7).
+- **Medidas:** A′ de Grier (sensibilidad), secuencias cazadas, falsas alarmas con su tasa y latencia media de los aciertos.
+- **Señal en cada respuesta:** «✓ Cazada» en lima, «✗ No había secuencia» y «Se te pasó una» en naranja, con el marco de la escena del mismo color. El aviso de la omisión llega al cerrarse su ventana.
+- Los parámetros se tomaron del protocolo RVP de CANTAB de memoria, sin contrastarlos con el manual; la ventana de 1,8 s es el menos seguro.
+

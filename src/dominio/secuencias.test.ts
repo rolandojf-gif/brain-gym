@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CONFIG, cerrar, esObjetivo, mediana, nuevaPartida, pulsar, siguienteDigito, type Partida } from './secuencias';
+import { CONFIG, CONFIG_PRACTICA, aPrima, cerrar, esObjetivo, nuevaPartida, pulsar, siguienteDigito, type Partida } from './secuencias';
 
-/** Azar que no inserta ninguna secuencia y saca el dígito pedido como relleno (2 + floor(x·8)). */
+/** Azar que no inserta ninguna secuencia ni señuelo y saca el dígito pedido como relleno (2 + floor(x·8)). */
 function relleno(digito: number): () => number {
-  const valores = [0.99, (digito - 2) / 8 + 0.01];
+  const valores = [0.99, 0.99, (digito - 2) / 8 + 0.01];
   return () => valores.shift() ?? 0.5;
 }
 
@@ -67,12 +67,11 @@ describe('pulsar', () => {
     expect(p.aciertos).toBe(1);
   });
 
-  it('pulsar sin secuencia es un falso positivo y frena el ritmo', () => {
+  it('pulsar sin secuencia es un falso positivo', () => {
     const p = nuevaPartida(0);
     mostrar(p, [9, 3, 5]);
     expect(pulsar(p, 1300).tipo).toBe('falso-positivo');
     expect(p.falsosPositivos).toBe(1);
-    expect(p.intervalo).toBe(CONFIG.intervaloInicial + CONFIG.paso);
   });
 
   it('pulsar dos veces por la misma secuencia: la segunda es falso positivo', () => {
@@ -82,11 +81,14 @@ describe('pulsar', () => {
     expect(pulsar(p, 1600).tipo).toBe('falso-positivo');
   });
 
-  it('la secuencia que pasa sin respuesta es una omisión y frena el ritmo', () => {
+  it('la secuencia que pasa sin respuesta es una omisión; dentro de la ventana de 1,8 s aún vale', () => {
     const p = nuevaPartida(0);
-    mostrar(p, [2, 4, 6, 9, 9, 9, 9]); // el 6 sale en 1200; en 3600 ya pasó la ventana
-    expect(p.omisiones).toBe(1);
-    expect(p.intervalo).toBe(CONFIG.intervaloInicial + CONFIG.paso);
+    mostrar(p, [2, 4, 6, 9, 9, 9]); // el 6 sale en 1200; en 3000 se cumplen justo 1800
+    expect(p.omisiones).toBe(0);
+    expect(pulsar(p, 1200 + CONFIG.ventana).tipo).toBe('acierto');
+    const q = nuevaPartida(0);
+    mostrar(q, [2, 4, 6, 9, 9, 9, 9]); // en 3600 ya pasó
+    expect(q.omisiones).toBe(1);
   });
 
   it('2-4-6-8 son dos secuencias', () => {
@@ -96,32 +98,45 @@ describe('pulsar', () => {
     expect(pulsar(p, 2200).tipo).toBe('acierto');
   });
 
-  it('cinco aciertos seguidos aceleran un paso; un fallo reinicia la cuenta', () => {
+  it('un señuelo sale con los dos primeros dígitos de una secuencia y un tercero que no la cierra', () => {
+    // No inserta secuencia, sí señuelo, elige 2-4-6 y el primero de los otros (2).
+    const valores = [0.99, 0.01, 0.0, 0.0];
     const p = nuevaPartida(0);
-    let t = 0;
-    for (let i = 0; i < 5; i++) {
-      t = mostrar(p, [9, 2, 4, 6], t + 600);
-      pulsar(p, t + 400);
-    }
-    expect(p.intervalo).toBe(CONFIG.intervaloInicial - CONFIG.paso);
-    pulsar(p, t + 500); // falso positivo
-    expect(p.racha).toBe(0);
-    expect(p.intervalo).toBe(CONFIG.intervaloInicial);
+    for (let i = 0; i < 3; i++) siguienteDigito(p, i * 600, () => valores.shift() ?? 0.99);
+    expect(p.digitos).toEqual([2, 4, 2]);
+    expect(p.abiertos).toHaveLength(0);
   });
 
-  it('el ritmo no sale de sus límites', () => {
+  it('el ritmo es fijo: ni los aciertos ni los fallos lo cambian', () => {
     const p = nuevaPartida(0);
-    for (let i = 0; i < 50; i++) pulsar(p, i);
-    expect(p.intervalo).toBe(CONFIG.intervaloMax);
+    const t = mostrar(p, [2, 4, 6]);
+    pulsar(p, t + 300);
+    pulsar(p, t + 400);
+    expect(p.config.intervalo).toBe(600);
+  });
+});
 
-    const q = nuevaPartida(0);
-    let t = 0;
-    for (let i = 0; i < 100; i++) {
-      t = mostrar(q, [9, 4, 6, 8], t + 600);
-      pulsar(q, t + 300);
-    }
-    expect(q.intervalo).toBe(CONFIG.intervaloMin);
-    expect(cerrar(q, t + 600).intervaloMin).toBe(CONFIG.intervaloMin);
+describe('práctica', () => {
+  it('marca los dígitos de una secuencia sólo durante la primera mitad', () => {
+    const insertar = () => { const v = [0.01, 0.0]; return () => v.shift() ?? 0.99; };
+    const p = nuevaPartida(0, CONFIG_PRACTICA);
+    siguienteDigito(p, 0, insertar());
+    expect(p.pista).toBe(true);
+    siguienteDigito(p, 600, () => 0.99);
+    expect(p.pista).toBe(true);
+    siguienteDigito(p, 1200, () => 0.99);
+    expect(p.pista).toBe(true);
+    siguienteDigito(p, 1800, relleno(9));
+    expect(p.pista).toBe(false);
+    siguienteDigito(p, CONFIG_PRACTICA.pistasHasta + 600, insertar());
+    expect(p.pista).toBe(false);
+  });
+
+  it('en una partida normal no hay pistas', () => {
+    const v = [0.01, 0.0];
+    const p = nuevaPartida(0);
+    siguienteDigito(p, 0, () => v.shift() ?? 0.99);
+    expect(p.pista).toBe(false);
   });
 });
 
@@ -134,7 +149,7 @@ describe('cerrar', () => {
     expect(r.objetivos).toBe(0);
   });
 
-  it('resume aciertos, omisiones, falsos positivos y la mediana de reacción', () => {
+  it('resume aciertos, omisiones, falsos positivos, latencia media y A′', () => {
     const p = nuevaPartida(0);
     let t = mostrar(p, [3, 5, 7]);
     pulsar(p, t + 400);
@@ -143,14 +158,24 @@ describe('cerrar', () => {
     pulsar(p, t + 900); // falso positivo
     t = mostrar(p, [2, 4, 6, 9, 9, 9, 9], t + 600); // omisión
     const r = cerrar(p, t + 600);
-    expect(r).toMatchObject({ aciertos: 2, omisiones: 1, falsosPositivos: 1, objetivos: 3, reaccionMediana: 500 });
+    expect(r).toMatchObject({ aciertos: 2, omisiones: 1, falsosPositivos: 1, objetivos: 3, latenciaMedia: 500 });
+    // h = 2/3; f = 1 falsa alarma entre 11 dígitos que no cerraban secuencia.
+    expect(r.tasaFalsasAlarmas).toBeCloseTo(1 / 11);
+    expect(r.aPrima).toBeCloseTo(aPrima(2 / 3, 1 / 11));
   });
 });
 
-describe('mediana', () => {
-  it('par, impar y vacía', () => {
-    expect(mediana([])).toBeNull();
-    expect(mediana([3, 1, 2])).toBe(2);
-    expect(mediana([4, 1, 3, 2])).toBe(2.5);
+describe('aPrima', () => {
+  it('1 con todo aciertos y sin falsas alarmas; 0,5 al azar; por debajo si pulsas más donde no toca', () => {
+    expect(aPrima(1, 0)).toBe(1);
+    expect(aPrima(0.5, 0.5)).toBe(0.5);
+    expect(aPrima(0, 0)).toBe(0.5);
+    expect(aPrima(0.9, 0.1)).toBeCloseTo(0.944, 3);
+    expect(aPrima(0.1, 0.9)).toBeCloseTo(0.056, 3);
+  });
+
+  it('sin objetivos no hay A′', () => {
+    const p = nuevaPartida(0);
+    expect(cerrar(p, 0).aPrima).toBeNull();
   });
 });

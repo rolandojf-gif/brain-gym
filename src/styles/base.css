@@ -486,11 +486,18 @@ table.cap td { padding: 6px 8px; }
 .sec-barra { position: absolute; inset: 0 0 auto 0; height: 6px; background: #2E2E2A; }
 .sec-barra span { display: block; height: 100%; width: 0; background: var(--lime); transition: width .3s linear; }
 .sec-digito { font: 700 clamp(110px, 26vw, 200px)/1 var(--f-mono); font-variant-numeric: tabular-nums; color: #E8E7E1; }
-.sec-ritmo { position: absolute; bottom: 10px; right: 12px; margin: 0; color: #9C9B95; }
-.sec-bien { animation: sec-bien .35s ease-out; }
-.sec-mal { animation: sec-mal .35s ease-out; }
-@keyframes sec-bien { from { box-shadow: inset 0 0 0 10px var(--lime), var(--shadow); } }
-@keyframes sec-mal { from { box-shadow: inset 0 0 0 10px var(--orange), var(--shadow); } }
+.sec-ritmo { position: absolute; bottom: 18px; left: 20px; right: 20px; margin: 0; color: #9C9B95; text-align: center; }
+/* La señal de cada respuesta: siempre ocupa su sitio para que el dígito no salte al aparecer. */
+.sec-senal { margin: 6px 0 0; min-height: 30px; font: 700 20px/30px var(--f-mono); letter-spacing: .02em; opacity: 0; transition: opacity .25s ease; }
+.sec-senal.visible { opacity: 1; transition: none; }
+.sec-senal.bien { color: var(--lime); }
+.sec-senal.mal { color: var(--orange); }
+/* Práctica: los dígitos de una secuencia salen subrayados en lima. */
+.sec-digito.pista { color: var(--lime); text-decoration: underline; text-underline-offset: .12em; text-decoration-thickness: 6px; }
+.sec-bien { animation: sec-bien .6s ease-out; }
+.sec-mal { animation: sec-mal .6s ease-out; }
+@keyframes sec-bien { from { box-shadow: inset 0 0 0 14px var(--lime), var(--shadow); } }
+@keyframes sec-mal { from { box-shadow: inset 0 0 0 14px var(--orange), var(--shadow); } }
 .sec-boton {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   width: 100%; min-height: 96px; background: var(--lime); color: #121211;
